@@ -700,77 +700,15 @@ html, body {
   to { transform: rotate(360deg); }
 }
 
-/* Card Divider */
-.urja-card-divider {
-  display: flex;
-  align-items: center;
-  text-align: center;
-  color: var(--urja-slate-400);
-  font-size: 0.66rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  margin: clamp(0.08rem, 0.35vh, 0.2rem) 0;
-}
-
-.urja-card-divider::before,
-.urja-card-divider::after {
-  content: '';
-  flex: 1;
-  border-bottom: 1px solid var(--urja-slate-200);
-}
-
-.urja-card-divider span {
-  padding: 0 0.65rem;
-}
-
-/* Microsoft SSO Button */
-.urja-ms-sso-btn {
-  width: 100%;
-  padding: clamp(0.42rem, 0.8vh, 0.5rem) 0.8rem;
-  background: #ffffff;
-  border: 1.5px solid var(--urja-slate-200);
-  border-radius: 7px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.55rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-}
-
-.urja-ms-sso-btn:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-}
-
-.ms-icon-tiles {
-  display: grid;
-  grid-template-columns: 6.5px 6.5px;
-  grid-template-rows: 6.5px 6.5px;
-  gap: 2px;
-}
-
-.tile-red { background: #f25022; }
-.tile-green { background: #7fba00; }
-.tile-blue { background: #00a4ef; }
-.tile-yellow { background: #ffb900; }
-
-.ms-btn-text {
-  color: var(--urja-slate-800);
-  font-weight: 600;
-  font-size: clamp(0.74rem, 1.15vh, 0.8rem);
-}
-
 /* Security Footer */
 .urja-security-footer {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
-  font-size: clamp(0.62rem, 1vh, 0.66rem);
+  font-size: clamp(0.62rem, 1vh, 0.68rem);
   color: var(--urja-slate-500);
-  margin-top: 0.05rem;
+  margin-top: clamp(0.4rem, 0.9vh, 0.65rem);
 }
 
 .urja-security-footer svg {
@@ -1012,10 +950,6 @@ html, body {
     padding: 0.46rem 0.9rem;
     font-size: 0.84rem;
   }
-  .urja-ms-sso-btn {
-    padding: 0.38rem 0.7rem;
-    font-size: 0.75rem;
-  }
 }
 
 /* Ultra-Compact Viewport Heights (viewport height <= 590px, e.g. 150% scaled displays or split-screen) */
@@ -1083,13 +1017,6 @@ html, body {
   .urja-green-submit-btn {
     padding: 0.4rem 0.75rem;
     font-size: 0.8rem;
-  }
-  .urja-ms-sso-btn {
-    padding: 0.34rem 0.65rem;
-    font-size: 0.72rem;
-  }
-  .card-or-divider {
-    margin: 0.1rem 0;
   }
   .urja-security-footer {
     display: none;
@@ -1216,9 +1143,5 @@ html, body {
   .urja-green-submit-btn {
     padding: 0.7rem;
     font-size: 0.92rem;
-  }
-  .urja-ms-sso-btn {
-    padding: 0.65rem;
-    font-size: 0.85rem;
   }
 }

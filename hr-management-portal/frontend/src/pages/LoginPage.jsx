@@ -66,23 +66,6 @@ export default function LoginPage({ onLoginSuccess }) {
     }
   };
 
-  const handleMicrosoftSSO = async () => {
-    setIsLoading(true);
-    setErrorMessage('');
-    try {
-      const authData = await authService.login('hradmin@company.com', 'password', rememberMe);
-      authData.name = 'Priyanka Sen (Urja Microsoft 365 SSO)';
-      authData.email = 'priyanka.sen@urjafoods.com';
-      setIsLoading(false);
-      if (onLoginSuccess) {
-        onLoginSuccess(authData);
-      }
-    } catch (err) {
-      setIsLoading(false);
-      setErrorMessage('Microsoft SSO could not authenticate with backend. Please verify server status.');
-    }
-  };
-
   return (
     <div className="urja-login-viewport">
       
@@ -395,28 +378,6 @@ export default function LoginPage({ onLoginSuccess }) {
                     </svg>
                   </>
                 )}
-              </button>
-
-              {/* OR Divider */}
-              <div className="urja-card-divider">
-                <span>OR</span>
-              </div>
-
-              {/* Sign in with Microsoft Button */}
-              <button
-                type="button"
-                id="msSignInBtn"
-                className="urja-ms-sso-btn"
-                onClick={handleMicrosoftSSO}
-                disabled={isLoading}
-              >
-                <div className="ms-icon-tiles">
-                  <span className="tile-red"></span>
-                  <span className="tile-green"></span>
-                  <span className="tile-blue"></span>
-                  <span className="tile-yellow"></span>
-                </div>
-                <span className="ms-btn-text">Sign in with Microsoft</span>
               </button>
 
               {/* Security Badge Footer */}

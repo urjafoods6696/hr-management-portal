@@ -41,8 +41,7 @@ export function isJwtTokenValid(token) {
     !trimmed ||
     trimmed === 'null' ||
     trimmed === 'undefined' ||
-    trimmed.startsWith('demo-') ||
-    trimmed.startsWith('ms-sso-')
+    trimmed.startsWith('demo-')
   ) {
     return false;
   }
@@ -248,7 +247,7 @@ export function installFetchInterceptor() {
       const isCorrupted = !existingAuth || existingAuth.includes('null') || existingAuth.includes('undefined') || existingAuth === 'Bearer ';
       if (isCorrupted && token && isJwtTokenValid(token)) {
         headers.set('Authorization', `Bearer ${token}`);
-      } else if (existingAuth && (existingAuth.includes('demo-jwt') || existingAuth.includes('ms-sso'))) {
+      } else if (existingAuth && existingAuth.includes('demo-jwt')) {
         if (token && isJwtTokenValid(token)) {
           headers.set('Authorization', `Bearer ${token}`);
         }

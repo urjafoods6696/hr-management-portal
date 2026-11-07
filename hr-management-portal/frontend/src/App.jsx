@@ -517,6 +517,48 @@ export default function App() {
     }
   }, [isAuthenticated, currentUser?.id, currentUser?.email, currentUser?.role, fetchNotifications]);
 
+  // Live Requisitions from MySQL Backend API
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const token = getStoredToken();
+    if (!token) return;
+
+    let isMounted = true;
+    fetch('http://localhost:8080/api/v1/requisitions?size=100', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+      .then(res => res.ok ? res.json() : null)
+      .then(body => {
+        const list = body?.data?.content || body?.data;
+        if (isMounted && Array.isArray(list) && list.length > 0) {
+          const mapped = list.map(r => ({
+            id: r.id,
+            code: r.requisitionCode,
+            title: r.jobTitle,
+            deptName: r.departmentName || 'General',
+            location: r.location || 'Pune / Plant Rahuri',
+            openings: r.headcount || 1,
+            status: r.status === 'APPROVED' || r.status === 'SOURCING' || r.status === 'INTERVIEWING' ? 'Open' : (r.status === 'CLOSED' || r.status === 'FILLED' ? 'Closed' : 'In Approval'),
+            approvalStage: r.status === 'APPROVED' || r.status === 'SOURCING' || r.status === 'INTERVIEWING' || r.status === 'RECRUITER_ASSIGNED' ? 'Approved' : 'Pending with HOD',
+            createdOn: r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Recently',
+            targetDate: r.dueDate || '30 Days SLA',
+            hiringManager: r.createdByName || 'HR Manager',
+            priority: r.priority || 'MEDIUM',
+            experience: `${r.experienceYearsMin || 1}-${r.experienceYearsMax || 5} Years`,
+            budgetMin: r.minBudget ? `₹${(r.minBudget / 100000).toFixed(1)} LPA` : '₹6.0 LPA',
+            budgetMax: r.maxBudget ? `₹${(r.maxBudget / 100000).toFixed(1)} LPA` : '₹12.0 LPA',
+            description: r.jobDescription || r.justification || ''
+          }));
+          setRequisitions(mapped);
+        }
+      })
+      .catch(err => {
+        console.warn('Could not fetch live requisitions from MySQL:', err);
+      });
+
+    return () => { isMounted = false; };
+  }, [isAuthenticated]);
+
   // Mark an individual notification as READ
   const handleMarkAsRead = async (notifId, e) => {
     if (e && e.stopPropagation) e.stopPropagation();

@@ -4,7 +4,6 @@ import './styles/portal.css';
 import './styles/urja-dashboard.css';
 import LoginPage from './pages/LoginPage';
 import IndianHeaderClock, { useIndianTime } from './components/IndianHeaderClock';
-import MonthlyHiringTrendChart from './components/MonthlyHiringTrendChart';
 import CandidateProfileResume from './components/CandidateProfileResume';
 import CreateRequisitionWizard from './components/CreateRequisitionWizard';
 import RequisitionDetailView from './components/RequisitionDetailView';
@@ -28,7 +27,6 @@ import './styles/urja-employees.css';
 import './styles/urja-tasks.css';
 
 import {
-  INITIAL_ROLES,
   INITIAL_USERS,
   INITIAL_DEPARTMENTS,
   INITIAL_LOCATIONS,

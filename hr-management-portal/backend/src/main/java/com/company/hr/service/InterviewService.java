@@ -45,19 +45,36 @@ public class InterviewService {
         List<User> users = userRepository.findEligibleInterviewers();
         return users.stream()
                 .filter(u -> u.getStatus() == User.UserStatus.ACTIVE)
-                .filter(this::isUserEligibleInterviewer)
                 .map(this::mapToEligibleInterviewerResponse)
                 .collect(Collectors.toList());
     }
 
     public boolean isUserEligibleInterviewer(User user) {
-        if (user == null || user.getStatus() != User.UserStatus.ACTIVE) return false;
-        return user.getRoles().stream()
-                .anyMatch(r -> r.getRoleName().equals("ROLE_INTERVIEWER")
-                        || r.getRoleName().equals("ROLE_DEPT_HEAD")
-                        || r.getRoleName().equals("ROLE_APPROVING_MANAGER")
-                        || r.getRoleName().equals("ROLE_HR_ADMIN")
-                        || r.getRoleName().equals("ROLE_HRBP"));
+        return user != null && user.getStatus() == User.UserStatus.ACTIVE;
+    }
+
+    public static String formatSystemRole(User user) {
+        if (user.getRoles() == null || user.getRoles().isEmpty()) {
+            return "User";
+        }
+        for (Role r : user.getRoles()) {
+            String rn = r.getRoleName();
+            if ("ROLE_HR_ADMIN".equals(rn)) return "HR Administrator";
+            if ("ROLE_IT_ADMIN".equals(rn)) return "Administrator";
+            if ("ROLE_HR_RECRUITER".equals(rn)) return "Recruiter";
+            if ("ROLE_INTERVIEWER".equals(rn)) return "Interviewer";
+            if ("ROLE_DEPT_HEAD".equals(rn)) return "Department Head";
+            if ("ROLE_APPROVING_MANAGER".equals(rn)) return "Approving Manager";
+            if ("ROLE_HRBP".equals(rn)) return "HR Business Partner";
+            if ("ROLE_SENIOR_MGMT".equals(rn)) return "Senior Management";
+            if ("ROLE_EMPLOYEE".equals(rn)) return "Employee";
+        }
+        Role first = user.getRoles().iterator().next();
+        String raw = first.getRoleName().replace("ROLE_", "").replace("_", " ").toLowerCase();
+        return java.util.Arrays.stream(raw.split(" "))
+                .filter(s -> !s.isEmpty())
+                .map(s -> Character.toUpperCase(s.charAt(0)) + s.substring(1))
+                .collect(Collectors.joining(" "));
     }
 
     private EligibleInterviewerResponse mapToEligibleInterviewerResponse(User user) {
@@ -79,6 +96,8 @@ public class InterviewService {
                 .map(Role::getRoleName)
                 .collect(Collectors.toList());
 
+        String systemRole = formatSystemRole(user);
+
         return EligibleInterviewerResponse.builder()
                 .id(user.getId())
                 .name(user.getName())
@@ -89,6 +108,7 @@ public class InterviewService {
                 .department(department)
                 .status(user.getStatus().name())
                 .roles(roleNames)
+                .systemRole(systemRole)
                 .eligible(true)
                 .build();
     }
@@ -197,14 +217,14 @@ public class InterviewService {
                 .active(true)
                 .available(true)
                 .hasConflict(false)
-                .message("Panel member availability and role credentials verified.")
+                .message("User availability and credentials verified.")
                 .build();
     }
 
     @Transactional
     public Interview scheduleInterview(InterviewScheduleRequest request, UserPrincipal currentUser) {
-        if (currentUser != null && !accessPolicyService.canUserAssignInterviewers(currentUser)) {
-            throw new AccessDeniedException("User role is not authorized to schedule interviews or assign interviewers");
+        if (currentUser != null && !currentUser.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_HR_ADMIN"))) {
+            throw new AccessDeniedException("Only users with the HR Admin role can schedule interview rounds or assign interviewers");
         }
 
         Candidate candidate = candidateRepository.findById(request.getCandidateId())
@@ -218,10 +238,6 @@ public class InterviewService {
 
         if (interviewer.getStatus() != User.UserStatus.ACTIVE) {
             throw new BadRequestException("Selected interviewer " + interviewer.getName() + " is inactive or suspended");
-        }
-
-        if (!isUserEligibleInterviewer(interviewer)) {
-            throw new BadRequestException("Selected user " + interviewer.getName() + " does not hold an authorized interviewer role");
         }
 
         // Validate availability / overlapping schedule check (same day/hour conflict check)
@@ -281,6 +297,7 @@ public class InterviewService {
                 .meetingLink(meetingLink)
                 .meetingLocation(meetingLocation)
                 .instructions(request.getInstructions() != null ? request.getInstructions() : "Evaluate candidate skills for " + requisition.getJobTitle() + " and submit scorecard.")
+                .evaluationCriteria(request.getEvaluationCriteria())
                 .status(Interview.InterviewStatus.SCHEDULED)
                 .build();
 
@@ -291,11 +308,17 @@ public class InterviewService {
         candidateRepository.save(candidate);
 
         // Automatically assign feedback task to interviewer
+        String taskDesc = interview.getInstructions();
+        if (interview.getEvaluationCriteria() != null && !interview.getEvaluationCriteria().isBlank()) {
+            if (taskDesc != null && !taskDesc.contains("Criteria:")) {
+                taskDesc = taskDesc + "\nEvaluation Focus Areas & Criteria: " + interview.getEvaluationCriteria();
+            }
+        }
         RecruitmentTask task = RecruitmentTask.builder()
                 .requisition(requisition)
                 .assignedUser(interviewer)
                 .taskTitle("Conduct " + request.getRound() + " Interview: " + candidate.getName())
-                .taskDescription(interview.getInstructions())
+                .taskDescription(taskDesc)
                 .dueDate(request.getScheduledAt().toLocalDate())
                 .status(RecruitmentTask.TaskStatus.PENDING)
                 .priority(RecruitmentTask.TaskPriority.HIGH)
@@ -345,8 +368,8 @@ public class InterviewService {
 
     @Transactional
     public Interview rescheduleInterview(Long interviewId, InterviewRescheduleRequest request, UserPrincipal currentUser) {
-        if (currentUser != null && !accessPolicyService.canUserAssignInterviewers(currentUser)) {
-            throw new AccessDeniedException("User role is not authorized to reschedule interviews or reassign panel");
+        if (currentUser != null && !currentUser.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_HR_ADMIN"))) {
+            throw new AccessDeniedException("Only users with the HR Admin role can reschedule interview rounds");
         }
 
         Interview interview = interviewRepository.findById(interviewId)
@@ -448,8 +471,8 @@ public class InterviewService {
 
     @Transactional
     public Interview reassignInterview(Long interviewId, InterviewReassignRequest request, UserPrincipal currentUser) {
-        if (currentUser != null && !accessPolicyService.canUserAssignInterviewers(currentUser)) {
-            throw new AccessDeniedException("User role is not authorized to reassign interview panel members");
+        if (currentUser != null && !currentUser.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_HR_ADMIN"))) {
+            throw new AccessDeniedException("Only users with the HR Admin role can reassign interview tasks");
         }
 
         Interview interview = interviewRepository.findById(interviewId)
@@ -460,11 +483,7 @@ public class InterviewService {
                 .orElseThrow(() -> new ResourceNotFoundException("New interviewer not found with ID: " + request.getNewInterviewerId()));
 
         if (newInterviewer.getStatus() != User.UserStatus.ACTIVE) {
-            throw new BadRequestException("Target interviewer " + newInterviewer.getName() + " is inactive or suspended");
-        }
-
-        if (!isUserEligibleInterviewer(newInterviewer)) {
-            throw new BadRequestException("Selected user " + newInterviewer.getName() + " does not hold an authorized interviewer role");
+            throw new BadRequestException("Target user " + newInterviewer.getName() + " is inactive or suspended");
         }
 
         // Validate availability and conflict check for new interviewer
@@ -527,6 +546,10 @@ public class InterviewService {
 
     @Transactional
     public Interview cancelInterview(Long interviewId, String reason, UserPrincipal currentUser) {
+        if (currentUser != null && !currentUser.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_HR_ADMIN"))) {
+            throw new AccessDeniedException("Only users with the HR Admin role can cancel interview rounds");
+        }
+
         Interview interview = interviewRepository.findById(interviewId)
                 .orElseThrow(() -> new ResourceNotFoundException("Interview not found with ID: " + interviewId));
 
@@ -644,24 +667,23 @@ public class InterviewService {
 
         if (currentUser != null) {
             List<String> roles = currentUser.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList();
-            boolean isITAdmin = roles.contains("ROLE_IT_ADMIN");
             boolean isHRAdmin = roles.contains("ROLE_HR_ADMIN");
-            boolean isInterviewer = roles.contains("ROLE_INTERVIEWER");
-            boolean isRecruiter = roles.contains("ROLE_HR_RECRUITER");
 
-            if (isITAdmin && !isHRAdmin && !accessPolicyService.canItAdminAccessCandidates()) {
-                throw new AccessDeniedException("IT Admin is restricted from accessing candidate interview records by security policy");
-            }
+            if (!isHRAdmin) {
+                boolean isAssignedInterviewer = interview.getInterviewer() != null
+                        && currentUser.getId().equals(interview.getInterviewer().getId());
+                if (isAssignedInterviewer) {
+                    return interview;
+                }
 
-            if (isInterviewer && !isHRAdmin) {
-                if (!interview.getInterviewer().getId().equals(currentUser.getId())) {
-                    throw new AccessDeniedException("Access denied: You are only authorized to view your own assigned interviews");
+                boolean isRecruiter = roles.contains("ROLE_HR_RECRUITER");
+                Long recruiterId = (interview.getRequisition() != null && interview.getRequisition().getAssignedRecruiter() != null)
+                        ? interview.getRequisition().getAssignedRecruiter().getId() : null;
+                if (isRecruiter && currentUser.getId().equals(recruiterId)) {
+                    return interview;
                 }
-            } else if (isRecruiter && !isHRAdmin) {
-                Long recruiterId = interview.getRequisition().getAssignedRecruiter() != null ? interview.getRequisition().getAssignedRecruiter().getId() : null;
-                if (recruiterId == null || !recruiterId.equals(currentUser.getId())) {
-                    throw new AccessDeniedException("Access denied: You are only authorized to view interviews for your assigned requisitions");
-                }
+
+                throw new AccessDeniedException("Access denied: You are only authorized to view your own assigned interview records");
             }
         }
 
@@ -675,26 +697,17 @@ public class InterviewService {
         }
 
         List<String> roles = currentUser.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList();
-        boolean isITAdmin = roles.contains("ROLE_IT_ADMIN");
         boolean isHRAdmin = roles.contains("ROLE_HR_ADMIN");
-        boolean isInterviewer = roles.contains("ROLE_INTERVIEWER");
+        if (isHRAdmin) {
+            return interviewRepository.findAll(pageable);
+        }
+
         boolean isRecruiter = roles.contains("ROLE_HR_RECRUITER");
-
-        if (isInterviewer && !isHRAdmin) {
-            return interviewRepository.findByInterviewerId(currentUser.getId(), pageable);
+        if (isRecruiter) {
+            return interviewRepository.findByInterviewerOrRecruiter(currentUser.getId(), pageable);
         }
 
-        if (isRecruiter && !isHRAdmin) {
-            return interviewRepository.findByRequisitionAssignedRecruiterId(currentUser.getId(), pageable);
-        }
-
-        if (isITAdmin && !isHRAdmin) {
-            if (!accessPolicyService.canItAdminAccessCandidates()) {
-                return Page.empty(pageable);
-            }
-        }
-
-        return interviewRepository.findAll(pageable);
+        return interviewRepository.findByInterviewerId(currentUser.getId(), pageable);
     }
 
     @Transactional(readOnly = true)

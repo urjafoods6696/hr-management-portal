@@ -63,6 +63,9 @@ public class Interview {
     @Column(columnDefinition = "TEXT")
     private String instructions;
 
+    @Column(name = "evaluation_criteria", columnDefinition = "TEXT")
+    private String evaluationCriteria;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     @Builder.Default

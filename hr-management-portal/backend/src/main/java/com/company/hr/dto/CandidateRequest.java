@@ -34,8 +34,15 @@ public class CandidateRequest {
     private BigDecimal expectedCtc;
     private Integer noticePeriodDays;
     private String primarySkills;
+    private String linkedinUrl;
+    private String professionalSummary;
+    private String workExperience;
+    private String educationDetails;
+    private String certifications;
+    private String hrNotes;
     private Candidate.CandidateSource source;
 
-    @NotNull(message = "Requisition ID is required")
     private Long requisitionId;
+    private String departmentName;
+    private String location;
 }

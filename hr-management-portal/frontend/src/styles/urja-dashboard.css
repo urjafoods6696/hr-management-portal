@@ -3695,20 +3695,13 @@
   z-index: 1050;
 }
 
+/* Tooltip visibility depends exclusively on mouse hover, independent of active or focus state */
 .urja-nav-item-v2:hover::after,
-.urja-nav-item-v2:focus::after,
-.urja-nav-item-v2:focus-visible::after {
+.urja-nav-item-v2:hover::before {
   opacity: 1;
   visibility: visible;
   transform: translateY(-50%) scale(1);
-}
-
-.urja-nav-item-v2:hover::before,
-.urja-nav-item-v2:focus::before,
-.urja-nav-item-v2:focus-visible::before {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(-50%) scale(1);
+  z-index: 1060;
 }
 
 /* Sidebar Bottom Leaf Graphic - Absolute Background Decor */

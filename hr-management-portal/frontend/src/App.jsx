@@ -19,12 +19,15 @@ import ApprovalsInboxView from './components/ApprovalsInboxView';
 import EmployeesManagementView from './components/EmployeesManagementView';
 import TaskAssignmentView from './components/TaskAssignmentView';
 import ReportsAnalyticsView from './components/ReportsAnalyticsView';
+import AdminPasswordChangeModal from './components/AdminPasswordChangeModal';
+import UserProfileModal from './components/UserProfileModal';
 import useInactivityTimeout, { INACTIVITY_TIMEOUT_MS, LAST_ACTIVITY_KEY, SESSION_EVENT_KEY } from './hooks/useInactivityTimeout';
 import './styles/urja-reports.css';
 import './styles/urja-offers.css';
 import './styles/urja-approvals.css';
 import './styles/urja-employees.css';
 import './styles/urja-tasks.css';
+import './styles/urja-admin-password.css';
 
 import {
   INITIAL_USERS,
@@ -75,51 +78,109 @@ const getRoleDefaultTab = (roleId) => {
 };
 
 
-// Parse current route from window.location pathname and search query
-const parseCurrentRoute = () => {
-  if (typeof window === 'undefined') return { tab: 'dashboard', pathname: '/', search: '' };
+const ROUTE_TAB_ALIASES = {
+  dashboard: 'dashboard',
+  overview: 'dashboard',
+  home: 'dashboard',
+  approvals: 'approvals',
+  approval: 'approvals',
+  requisitions: 'requisitions',
+  requisition: 'requisitions',
+  'job-requisitions': 'requisitions',
+  jobs: 'requisitions',
+  job: 'requisitions',
+  candidates: 'candidates',
+  candidate: 'candidates',
+  applications: 'candidates',
+  application: 'candidates',
+  interviews: 'interviews',
+  interview: 'interviews',
+  offers: 'offers',
+  offer: 'offers',
+  onboarding: 'offers',
+  employees: 'employees',
+  employee: 'employees',
+  users: 'users',
+  user: 'users',
+  'user-management': 'users',
+  tasks: 'tasks',
+  task: 'tasks',
+  'my-tasks': 'tasks',
+  systemadmin: 'systemAdmin',
+  'system-admin': 'systemAdmin',
+  policies: 'systemAdmin',
+  admin: 'systemAdmin',
+  reports: 'reports',
+  report: 'reports',
+  analytics: 'reports',
+  settings: 'settings',
+  setting: 'settings',
+  calendar: 'calendar',
+  'my-calendar': 'calendar',
+  talentpool: 'talentPool',
+  'talent-pool': 'talentPool'
+};
 
-  const pathname = window.location.pathname; // e.g. "/dashboard/reports" or "/reports" or "/"
-  const search = window.location.search;     // e.g. "?tab=reports"
-  const urlParams = new URLSearchParams(search);
+const normalizeRouteTab = (rawTab) => {
+  if (!rawTab) return 'dashboard';
+  const cleaned = String(rawTab).trim();
+  if (!cleaned) return 'dashboard';
+  return ROUTE_TAB_ALIASES[cleaned.toLowerCase()] || cleaned;
+};
 
-  let tabFromQuery = urlParams.get('tab');
+// Parse current route from pathname and search query (supports nested paths like /candidates/123)
+const parseCurrentRoute = (pathnameInput = null, searchInput = null) => {
+  if (typeof window === 'undefined' && pathnameInput === null) {
+    return { tab: 'dashboard', pathname: '/', search: '', urlParams: new URLSearchParams(), segments: [], nestedSegments: [] };
+  }
+
+  const pathname = pathnameInput !== null ? pathnameInput : window.location.pathname; // e.g. "/candidates/123" or "/dashboard/reports"
+  const search = searchInput !== null ? searchInput : window.location.search;       // e.g. "?tab=reports"
+  const urlParams = new URLSearchParams(search || '');
+
+  const tabFromQuery = urlParams.get('tab');
   let tabFromPath = null;
+  let nestedSegments = [];
 
-  const pathParts = pathname.split('/').filter(Boolean);
+  const pathParts = (pathname || '/').split('/').filter(Boolean);
   if (pathParts.length > 0) {
-    if (pathParts[0] === 'dashboard' && pathParts[1]) {
-      tabFromPath = pathParts[1];
-    } else if (pathParts[0] !== 'dashboard' && pathParts[0] !== 'index.html') {
+    if (pathParts[0].toLowerCase() === 'dashboard') {
+      if (pathParts[1]) {
+        tabFromPath = pathParts[1];
+        nestedSegments = pathParts.slice(2);
+      } else {
+        tabFromPath = 'dashboard';
+      }
+    } else if (pathParts[0].toLowerCase() !== 'index.html') {
       tabFromPath = pathParts[0];
+      nestedSegments = pathParts.slice(1);
     }
   }
 
-  let resolvedTab = tabFromQuery || tabFromPath || 'dashboard';
-
-  // Support common aliases
-  if (resolvedTab === 'applications') resolvedTab = 'candidates';
-  if (resolvedTab === 'jobs') resolvedTab = 'requisitions';
+  const resolvedTab = normalizeRouteTab(tabFromQuery || tabFromPath || 'dashboard');
 
   return {
     tab: resolvedTab,
-    pathname,
-    search,
-    urlParams
+    pathname: pathname || '/',
+    search: search || '',
+    urlParams,
+    segments: pathParts,
+    nestedSegments
   };
 };
 
-// Synchronize URL with active tab and route
+// Synchronize URL with active tab and notify reactive location listeners
 const syncUrlWithRoute = (tab, extraParams = null) => {
   if (typeof window === 'undefined') return;
 
+  const canonicalTab = normalizeRouteTab(tab);
   const pathname = window.location.pathname;
   let newUrl;
   if (pathname.startsWith('/dashboard')) {
-    newUrl = `/dashboard/${tab}`;
+    newUrl = `/dashboard/${canonicalTab}`;
   } else {
     const params = new URLSearchParams(window.location.search);
-    params.set('tab', tab);
+    params.set('tab', canonicalTab);
     if (extraParams) {
       Object.entries(extraParams).forEach(([k, v]) => {
         if (v === null || v === undefined) params.delete(k);
@@ -131,8 +192,67 @@ const syncUrlWithRoute = (tab, extraParams = null) => {
 
   const currentFull = window.location.pathname + window.location.search;
   if (currentFull !== newUrl) {
-    window.history.pushState({ tab }, '', newUrl);
+    window.history.pushState({ tab: canonicalTab }, '', newUrl);
   }
+  window.dispatchEvent(new Event('urja:locationchange'));
+};
+
+// Determine dynamically whether a sidebar menu item matches the active route (including nested routes)
+const isRouteActive = (itemTab, appLocation, fallbackTab) => {
+  const targetTab = normalizeRouteTab(itemTab);
+  if (!appLocation) {
+    return normalizeRouteTab(fallbackTab) === targetTab;
+  }
+  const { pathname, search, route } = appLocation;
+  const parsed = route || parseCurrentRoute(pathname, search);
+  const hasExplicitPath = Boolean(pathname && pathname !== '/' && pathname !== '/index.html');
+  const hasTabQuery = Boolean(parsed.urlParams && parsed.urlParams.get('tab'));
+
+  if (hasExplicitPath || hasTabQuery) {
+    return parsed.tab === targetTab;
+  }
+  return normalizeRouteTab(fallbackTab || parsed.tab) === targetTab;
+};
+
+// Reactive location hook (History API equivalent of React Router's useLocation)
+const useAppLocation = () => {
+  const [locationState, setLocationState] = useState(() => {
+    if (typeof window === 'undefined') {
+      return { pathname: '/', search: '', hash: '' };
+    }
+    return {
+      pathname: window.location.pathname,
+      search: window.location.search,
+      hash: window.location.hash
+    };
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const syncLocation = () => {
+      const nextPathname = window.location.pathname;
+      const nextSearch = window.location.search;
+      const nextHash = window.location.hash;
+      setLocationState((prev) => {
+        if (prev.pathname === nextPathname && prev.search === nextSearch && prev.hash === nextHash) {
+          return prev;
+        }
+        return { pathname: nextPathname, search: nextSearch, hash: nextHash };
+      });
+    };
+
+    window.addEventListener('popstate', syncLocation);
+    window.addEventListener('urja:locationchange', syncLocation);
+    return () => {
+      window.removeEventListener('popstate', syncLocation);
+      window.removeEventListener('urja:locationchange', syncLocation);
+    };
+  }, []);
+
+  return useMemo(() => ({
+    ...locationState,
+    route: parseCurrentRoute(locationState.pathname, locationState.search)
+  }), [locationState]);
 };
 
 export default function App() {
@@ -160,6 +280,9 @@ export default function App() {
     return false;
   });
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showAdminPasswordModal, setShowAdminPasswordModal] = useState(false);
+  const [showUserProfileModal, setShowUserProfileModal] = useState(false);
+  const profileMenuRef = useRef(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const searchContainerRef = useRef(null);
@@ -186,6 +309,7 @@ export default function App() {
     }
 
     setIsAuthenticated(false);
+    setPendingApprovalsCount(0);
     setCurrentUser(null);
     setPersonalizedData(null);
 
@@ -338,19 +462,18 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const [requisitions, setRequisitions] = useState(INITIAL_REQUISITIONS);
-  const [candidates, setCandidates] = useState(INITIAL_CANDIDATES);
-  const [interviews, setInterviews] = useState(INITIAL_INTERVIEWS);
-  const [offers, setOffers] = useState(INITIAL_OFFERS);
-  const [employees, setEmployees] = useState(INITIAL_EMPLOYEES);
-  const [approvals, setApprovals] = useState(INITIAL_APPROVALS);
-  const [users, setUsers] = useState(INITIAL_USERS);
-  const [auditLogs, setAuditLogs] = useState(INITIAL_AUDIT_LOGS);
-  const [backups, setBackups] = useState(INITIAL_BACKUPS);
-  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
-  const [unreadNotifCount, setUnreadNotifCount] = useState(() => {
-    return INITIAL_NOTIFICATIONS.filter(n => n.unread !== false && n.readStatus !== 'READ' && !n.isRead).length;
-  });
+  const [requisitions, setRequisitions] = useState([]);
+  const [candidates, setCandidates] = useState([]);
+  const [interviews, setInterviews] = useState([]);
+  const [offers, setOffers] = useState([]);
+  const [employees, setEmployees] = useState([]);
+  const [approvals, setApprovals] = useState([]);
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
+  const [users, setUsers] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [backups, setBackups] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [isLoadingNotifs, setIsLoadingNotifs] = useState(false);
 
   // Screen 3: Requisitions Filters & Pagination
@@ -651,11 +774,14 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Close search dropdown on click outside
+  // Close search dropdown and profile menu on click outside
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (searchContainerRef.current && !searchContainerRef.current.contains(e.target)) {
         setIsSearchFocused(false);
+      }
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target)) {
+        setShowProfileMenu(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -673,9 +799,13 @@ export default function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Responsive tab navigation: switches tab and auto-closes drawer on mobile
+  const appLocation = useAppLocation();
+
+  // Responsive tab navigation: switches tab, syncs dynamic route location, and auto-closes drawer on mobile
   const handleNavTab = (tab) => {
-    setActiveTab(tab);
+    const canonicalTab = normalizeRouteTab(tab);
+    setActiveTab(canonicalTab);
+    syncUrlWithRoute(canonicalTab);
     setViewingReq(null);
     setSelectedCandidate(null);
     if (typeof window !== 'undefined' && window.innerWidth <= 992) {
@@ -732,17 +862,15 @@ export default function App() {
     if (!searchTerm.trim()) return;
 
     if (searchResults.jobs.length > 0) {
-      setActiveTab('requisitions');
-      setViewingReq(null);
+      handleNavTab('requisitions');
       setIsSearchFocused(false);
       showToast(`Showing search results for "${searchTerm}" in Requisitions`);
     } else if (searchResults.candidates.length > 0) {
-      setActiveTab('candidates');
-      setSelectedCandidate(null);
+      handleNavTab('candidates');
       setIsSearchFocused(false);
       showToast(`Showing search results for "${searchTerm}" in Candidates`);
     } else {
-      setActiveTab('requisitions');
+      handleNavTab('requisitions');
       setIsSearchFocused(false);
     }
   };
@@ -981,16 +1109,85 @@ export default function App() {
 
     // Same page persistence: target route from current URL, intended redirect, or role default
     const route = parseCurrentRoute();
-    const targetTab = intendedRedirect || (route.tab !== 'dashboard' ? route.tab : getRoleDefaultTab(fullUser.role));
+    const hasExplicitRoute = Boolean(
+      (route.pathname && route.pathname !== '/' && route.pathname !== '/index.html' && route.tab !== 'dashboard') ||
+      route.urlParams?.get('tab')
+    );
+    const targetTab = intendedRedirect || (hasExplicitRoute ? route.tab : getRoleDefaultTab(fullUser.role));
     setActiveTab(targetTab);
     setIntendedRedirect(null);
-    syncUrlWithRoute(targetTab);
+    if (route.pathname && route.pathname !== '/' && route.pathname !== '/index.html' && route.tab === targetTab) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('urja:locationchange'));
+      }
+    } else {
+      syncUrlWithRoute(targetTab);
+    }
 
     setIsAuthenticated(true);
     showToast(`Welcome back, ${fullUser.name}!`);
   };
 
-  const pendingApprovalsCount = approvals.filter(a => a.status === 'Pending').length;
+  // Dynamic database-backed pending approvals count for sidebar badge
+
+  // Live Database-Backed Pending Approvals Count for Sidebar Badge
+  const fetchPendingApprovalsCount = useCallback(async () => {
+    const token = getStoredToken();
+    if (!token) {
+      setPendingApprovalsCount(0);
+      return;
+    }
+
+    try {
+      const res = await fetch('http://localhost:8080/api/v1/approvals/pending-count', {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const cnt = Number(json?.data?.pendingCount);
+        setPendingApprovalsCount(isNaN(cnt) ? 0 : Math.max(0, cnt));
+        return;
+      }
+
+      // Fallback to summary-stats endpoint
+      const fbRes = await fetch('http://localhost:8080/api/v1/approvals/summary-stats', {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (fbRes.ok) {
+        const fbJson = await fbRes.json();
+        const cnt = Number(fbJson?.data?.pendingApprovals);
+        setPendingApprovalsCount(isNaN(cnt) ? 0 : Math.max(0, cnt));
+      }
+    } catch (err) {
+      console.warn('Approvals pending count fetch error:', err);
+    }
+  }, []);
+
+  // Sync approvals badge with backend on login, tab change, and approval actions
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchPendingApprovalsCount();
+    } else {
+      setPendingApprovalsCount(0);
+    }
+
+    const handleUpdate = () => {
+      fetchPendingApprovalsCount();
+    };
+
+    window.addEventListener('urja_approvals_updated', handleUpdate);
+    window.addEventListener('focus', handleUpdate);
+    return () => {
+      window.removeEventListener('urja_approvals_updated', handleUpdate);
+      window.removeEventListener('focus', handleUpdate);
+    };
+  }, [isAuthenticated, currentUser?.id, currentUser?.role, fetchPendingApprovalsCount]);
 
   // Role-scoped sidebar menu items
   const sidebarNavItems = useMemo(() => {
@@ -1056,14 +1253,12 @@ export default function App() {
     return items;
   }, [currentRoleId, currentUser?.role, currentUser?.roles, pendingApprovalsCount]);
 
-  // Determine authorized personalized data (Backend API or Authorized Role Fallback)
-  const isDeptHead = currentUser?.role === 'ROLE_DEPT_HEAD' || currentUser?.email?.includes('sanjay');
-
+  // Determine authorized personalized data from Backend API
   const activeMetrics = personalizedData?.metrics || {
-    activeRequisitions: isDeptHead ? 3 : 4,
-    assignedCandidates: isDeptHead ? 9 : 12,
-    interviewsThisWeek: isDeptHead ? 3 : 5,
-    pendingOffers: isDeptHead ? 1 : 2
+    activeRequisitions: 0,
+    assignedCandidates: 0,
+    interviewsThisWeek: 0,
+    pendingOffers: 0
   };
 
   // Role-tailored 4 KPI Metric Cards on Dashboard
@@ -1072,10 +1267,10 @@ export default function App() {
 
     if (role === 'ROLE_IT_ADMIN') {
       return [
-        { label: 'Total User Accounts', val: (users.length || 9), icon: 'bi-people-fill', color: 'green', tab: 'users' },
-        { label: 'Active User Logins', val: (users.filter(u => u.status === 'ACTIVE').length || 8), icon: 'bi-person-check-fill', color: 'blue', tab: 'users' },
+        { label: 'Total User Accounts', val: users.length, icon: 'bi-people-fill', color: 'green', tab: 'users' },
+        { label: 'Active User Logins', val: users.filter(u => u.status === 'ACTIVE').length, icon: 'bi-person-check-fill', color: 'blue', tab: 'users' },
         { label: 'Access Policies Enforced', val: 6, icon: 'bi-shield-check', color: 'purple', tab: 'systemAdmin' },
-        { label: 'Security & Audit Trails', val: (auditLogs.length || 9), icon: 'bi-shield-lock-fill', color: 'amber', tab: 'systemAdmin' }
+        { label: 'Security & Audit Trails', val: auditLogs.length, icon: 'bi-shield-lock-fill', color: 'amber', tab: 'systemAdmin' }
       ];
     }
 
@@ -1106,50 +1301,10 @@ export default function App() {
     ];
   }, [currentRoleId, currentUser?.role, currentUser?.roles, activeMetrics, users, auditLogs.length]);
 
-  const activeActivities = personalizedData?.recentActivities || (isDeptHead ? [
-    { id: 'act-1', title: 'New candidate shortlisted', subtitle: 'Production Engineer – Plant Shirdi', timeAgo: '1 hour ago', iconColor: 'green' },
-    { id: 'act-2', title: 'Technical interview scheduled', subtitle: 'Boiler Operator – Round 2', timeAgo: '4 hours ago', iconColor: 'purple' },
-    { id: 'act-3', title: 'Offer approval pending', subtitle: 'Feedmill Plant Supervisor – Rahuri', timeAgo: '1 day ago', iconColor: 'amber' },
-    { id: 'act-4', title: 'Feedback received', subtitle: 'Amit Joshi – Plant Operations', timeAgo: '2 days ago', iconColor: 'blue' }
-  ] : [
-    { id: 'act-1', title: 'New candidate assigned', subtitle: 'Software Engineer – Pune', timeAgo: '2 hours ago', iconColor: 'green' },
-    { id: 'act-2', title: 'Interview scheduled', subtitle: 'Amit Patil – Frontend Developer', timeAgo: '5 hours ago', iconColor: 'purple' },
-    { id: 'act-3', title: 'Feedback submitted', subtitle: 'Neha Shah – HR Executive', timeAgo: '1 day ago', iconColor: 'blue' },
-    { id: 'act-4', title: 'Offer letter sent', subtitle: 'Rohit More – Backend Developer', timeAgo: '1 day ago', iconColor: 'amber' }
-  ]);
-
-  const activeOpenRequisitions = personalizedData?.openRequisitions || (isDeptHead ? [
-    { id: 'REQ-1', jobTitle: 'Production Engineer', department: 'Plant Operations', location: 'Plant - Shirdi', status: 'Open', candidateCount: 6 },
-    { id: 'REQ-2', jobTitle: 'Feedmill Supervisor', department: 'Feedmill Plant', location: 'Plant - Rahuri', status: 'In Progress', candidateCount: 5 },
-    { id: 'REQ-3', jobTitle: 'Boiler Technician', department: 'Operations & Supply Chain', location: 'Plant - Shirdi', status: 'Open', candidateCount: 4 }
-  ] : [
-    { id: 'REQ-1', jobTitle: 'Assistant Manager', department: 'Soya Division', location: 'Plant - Rahuri', status: 'Open', candidateCount: 12 },
-    { id: 'REQ-2', jobTitle: 'QA Executive', department: 'Quality Assurance', location: 'Pune', status: 'In Progress', candidateCount: 8 },
-    { id: 'REQ-3', jobTitle: 'Production Engineer', department: 'Plant Operations', location: 'Plant - Shirdi', status: 'Open', candidateCount: 6 },
-    { id: 'REQ-4', jobTitle: 'HR Executive', department: 'Human Resources', location: 'Pune', status: 'On Hold', candidateCount: 4 }
-  ]);
-
-  const activeInterviews = personalizedData?.upcomingInterviews || (isDeptHead ? [
-    { id: 'int-1', dateDay: '16', dateMonth: 'Oct', candidateName: 'Mahesh Shinde', role: 'Production Engineer', time: '11:00 AM', mode: 'Onsite' },
-    { id: 'int-2', dateDay: '16', dateMonth: 'Oct', candidateName: 'Pooja Kale', role: 'Feedmill Supervisor', time: '03:30 PM', mode: 'Online' },
-    { id: 'int-3', dateDay: '17', dateMonth: 'Oct', candidateName: 'Ganesh Jadhav', role: 'Boiler Technician', time: '02:00 PM', mode: 'Onsite' }
-  ] : [
-    { id: 'int-1', dateDay: '16', dateMonth: 'Oct', candidateName: 'Amit Shah', role: 'Software Engineer', time: '10:00 AM', mode: 'Online' },
-    { id: 'int-2', dateDay: '16', dateMonth: 'Oct', candidateName: 'Neha Joshi', role: 'HR Executive', time: '02:00 PM', mode: 'Onsite' },
-    { id: 'int-3', dateDay: '17', dateMonth: 'Oct', candidateName: 'Rahul Patil', role: 'Quality Analyst', time: '11:30 AM', mode: 'Online' }
-  ]);
-
-  const activeTasks = personalizedData?.tasks || (isDeptHead ? [
-    { id: 'tsk-1', title: 'Approve requisition for Feedmill Supervisor', dueDate: '16 Oct 2026' },
-    { id: 'tsk-2', title: 'Review candidate shortlist – Production Engineer', dueDate: '16 Oct 2026' },
-    { id: 'tsk-3', title: 'Conduct final interview – Mahesh Shinde', dueDate: '17 Oct 2026' },
-    { id: 'tsk-4', title: 'Verify plant manpower budget for Q4', dueDate: '18 Oct 2026' }
-  ] : [
-    { id: 'tsk-1', title: 'Review candidate profile – Sohan Desai', dueDate: '16 Oct 2026' },
-    { id: 'tsk-2', title: 'Share interview feedback – Neha Shah', dueDate: '16 Oct 2026' },
-    { id: 'tsk-3', title: 'Shortlist candidates – QA Executive', dueDate: '17 Oct 2026' },
-    { id: 'tsk-4', title: 'Prepare offer letter – Rohit More', dueDate: '17 Oct 2026' }
-  ]);
+  const activeActivities = personalizedData?.recentActivities || [];
+  const activeOpenRequisitions = personalizedData?.openRequisitions || [];
+  const activeInterviews = personalizedData?.upcomingInterviews || [];
+  const activeTasks = personalizedData?.tasks || [];
 
   // Compute strict role permissions and route access
   const userRoles = useMemo(() => {
@@ -1233,23 +1388,28 @@ export default function App() {
 
         {/* Role-Scoped Menu Navigation Items */}
         <ul className="urja-sidebar-nav-v2">
-          {sidebarNavItems.map(item => (
-            <li key={item.tab}>
-              <button 
-                type="button"
-                className={`urja-nav-item-v2 ${activeTab === item.tab ? 'active' : ''}`} 
-                onClick={() => handleNavTab(item.tab)} 
-                data-tooltip={item.label}
-                aria-label={item.label}
-              >
-                <i className={`bi ${item.icon}`}></i>
-                <span className="urja-nav-item-text">{item.label}</span>
-                {item.badge > 0 && (
-                  <span className="urja-nav-badge">{item.badge}</span>
-                )}
-              </button>
-            </li>
-          ))}
+          {sidebarNavItems.map(item => {
+            const isActive = isRouteActive(item.tab, appLocation, activeTab);
+            return (
+              <li key={item.tab}>
+                <button
+                  type="button"
+                  className={`urja-nav-item-v2 ${isActive ? 'active' : ''}`}
+                  onClick={() => handleNavTab(item.tab)}
+                  data-tooltip={item.label}
+                  data-active={isActive ? 'true' : 'false'}
+                  aria-label={item.label}
+                  aria-current={isActive ? 'page' : undefined}
+                >
+                  <i className={`bi ${item.icon}`}></i>
+                  <span className="urja-nav-item-text">{item.label}</span>
+                  {Number(item.badge) > 0 && (
+                    <span className="urja-nav-badge">{Number(item.badge) > 99 ? '99+' : item.badge}</span>
+                  )}
+                </button>
+              </li>
+            );
+          })}
         </ul>
 
         {/* Decorative Leaf SVG in Bottom Left */}
@@ -1326,77 +1486,104 @@ export default function App() {
               )}
             </button>
 
-            {/* Authenticated User Profile Pill (Requirement 2) */}
-            <div 
-              className="urja-header-user-pill-v2"
-              onClick={() => setShowProfileMenu(!showProfileMenu)}
-              title="Account Menu"
-            >
-              <img 
-                src={currentUser?.profileImageUrl || currentUser?.avatar || (currentUser?.role === 'ROLE_DEPT_HEAD' ? '/assets/images/man.jpg' : '/assets/images/woman.jpg')} 
-                alt={currentUser?.name || 'User'} 
-                className="urja-header-avatar-v2"
-                onError={(e) => { 
-                  e.target.src = currentUser?.role === 'ROLE_DEPT_HEAD' ? '/assets/images/man.jpg' : '/assets/images/woman.jpg'; 
-                }}
-              />
-              <div className="urja-header-user-info-v2">
-                <span className="urja-header-user-name-v2">{currentUser?.name || 'Urja User'}</span>
-                <span className="urja-header-user-title-v2">{currentUser?.title || (currentUser?.role === 'ROLE_DEPT_HEAD' ? 'Department Head' : 'HR Executive')}</span>
+            {/* Authenticated User Profile Pill & Dropdown Container */}
+            <div ref={profileMenuRef} style={{ position: 'relative' }}>
+              <div 
+                className="urja-header-user-pill-v2"
+                id="urjaHeaderUserPill"
+                onClick={() => setShowProfileMenu(!showProfileMenu)}
+                title="Account Menu • Click to open profile"
+              >
+                <img 
+                  src={currentUser?.profileImageUrl || currentUser?.avatar || (currentUser?.role === 'ROLE_DEPT_HEAD' ? '/assets/images/man.jpg' : '/assets/images/woman.jpg')} 
+                  alt={currentUser?.name || 'User'} 
+                  className="urja-header-avatar-v2"
+                  onError={(e) => { 
+                    e.target.src = currentUser?.role === 'ROLE_DEPT_HEAD' ? '/assets/images/man.jpg' : '/assets/images/woman.jpg'; 
+                  }}
+                />
+                <div className="urja-header-user-info-v2">
+                  <span className="urja-header-user-name-v2">{currentUser?.name || 'Urja User'}</span>
+                  <span className="urja-header-user-title-v2">{currentUser?.title || (currentUser?.role === 'ROLE_DEPT_HEAD' ? 'Department Head' : 'HR Executive')}</span>
+                </div>
+                <i className="bi bi-chevron-down urja-header-chevron-v2"></i>
               </div>
-              <i className="bi bi-chevron-down urja-header-chevron-v2"></i>
-            </div>
 
-            {/* Profile Dropdown Menu - Individual Authenticated User (Zero Test Accounts) */}
-            {showProfileMenu && (
-              <div className="urja-profile-dropdown-v2" id="urja-user-profile-menu">
-                <div className="urja-dropdown-header-v2">
-                  <div className="urja-dropdown-header-name">{currentUser?.name || 'Urja User'}</div>
-                  <div className="urja-dropdown-header-email">{currentUser?.email || ''}</div>
-                  <div className="urja-dropdown-header-dept">
-                    {(currentUser?.department || currentUser?.dept || 'Human Resources')} • {(currentUser?.designation || currentUser?.title || 'Team Member')}
+              {/* Profile Dropdown Menu - Individual Authenticated User (Zero Test Accounts) */}
+              {showProfileMenu && (
+                <div className="urja-profile-dropdown-v2" id="urja-user-profile-menu">
+                  <div 
+                    className="urja-dropdown-header-v2"
+                    style={{ cursor: 'pointer', transition: 'background-color 0.15s' }}
+                    title="View full user profile"
+                    onClick={() => {
+                      setShowProfileMenu(false);
+                      setShowUserProfileModal(true);
+                    }}
+                  >
+                    <div className="urja-dropdown-header-name">{currentUser?.name || 'Urja User'}</div>
+                    <div className="urja-dropdown-header-email">{currentUser?.email || ''}</div>
+                    <div className="urja-dropdown-header-dept">
+                      {(currentUser?.department || currentUser?.dept || 'Human Resources')} • {(currentUser?.designation || currentUser?.title || 'Team Member')}
+                    </div>
                   </div>
-                </div>
 
-                <div className="py-1">
+                  <div className="py-1">
+                    <button 
+                      className="urja-dropdown-item-v2"
+                      id="headerMyProfileBtn"
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        setShowUserProfileModal(true);
+                      }}
+                    >
+                      <i className="bi bi-person-badge-fill" style={{ color: '#16a34a' }}></i>
+                      <span style={{ fontWeight: 600 }}>My Profile</span>
+                    </button>
+
+                    <button 
+                      className="urja-dropdown-item-v2"
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        if (permittedTabs.includes('settings')) {
+                          handleNavTab('settings');
+                        } else {
+                          showToast('Account settings are managed by your System Administrator.');
+                        }
+                      }}
+                    >
+                      <i className="bi bi-gear text-secondary"></i>
+                      <span>Account Settings</span>
+                    </button>
+
+                    {(currentUser?.role === 'ROLE_IT_ADMIN' || currentUser?.role === 'ROLE_HR_ADMIN' || (Array.isArray(currentUser?.roles) && (currentUser.roles.includes('ROLE_IT_ADMIN') || currentUser.roles.includes('ROLE_HR_ADMIN')))) && (
+                      <button 
+                        className="urja-dropdown-item-v2"
+                        id="adminEmailOtpPasswordBtn"
+                        style={{ color: '#15803d', fontWeight: 600 }}
+                        onClick={() => {
+                          setShowProfileMenu(false);
+                          setShowAdminPasswordModal(true);
+                        }}
+                      >
+                        <i className="bi bi-shield-lock-fill" style={{ color: '#16a34a' }}></i>
+                        <span>Change Password (Email OTP)</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="urja-dropdown-divider" style={{ borderTop: '1px solid #F1F5F9', margin: '0.25rem 0' }}></div>
+
                   <button 
-                    className="urja-dropdown-item-v2"
-                    onClick={() => {
-                      setShowProfileMenu(false);
-                      showToast(`Viewing profile of ${currentUser?.name}`);
-                    }}
+                    className="urja-dropdown-item-v2 logout"
+                    onClick={handleSignOut}
                   >
-                    <i className="bi bi-person text-secondary"></i>
-                    <span>My Profile</span>
-                  </button>
-
-                  <button 
-                    className="urja-dropdown-item-v2"
-                    onClick={() => {
-                      setShowProfileMenu(false);
-                      if (permittedTabs.includes('settings')) {
-                        handleNavTab('settings');
-                      } else {
-                        showToast('Account settings are managed by your System Administrator.');
-                      }
-                    }}
-                  >
-                    <i className="bi bi-gear text-secondary"></i>
-                    <span>Account Settings</span>
+                    <i className="bi bi-box-arrow-right"></i>
+                    <span>Sign Out</span>
                   </button>
                 </div>
-
-                <div className="urja-dropdown-divider" style={{ borderTop: '1px solid #F1F5F9', margin: '0.25rem 0' }}></div>
-
-                <button 
-                  className="urja-dropdown-item-v2 logout"
-                  onClick={handleSignOut}
-                >
-                  <i className="bi bi-box-arrow-right"></i>
-                  <span>Sign Out</span>
-                </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </header>
 
@@ -1495,19 +1682,26 @@ export default function App() {
                     <span className="urja-widget-viewall-v2" onClick={() => handleNavTab('candidates')}>View All →</span>
                   </div>
                   <div className="urja-activities-timeline-v2">
-                    {activeActivities.map((act) => (
-                      <div key={act.id} className="urja-activity-item-v2">
-                        <div className="urja-activity-connector-v2"></div>
-                        <div className={`urja-activity-icon-v2 ${act.iconColor || 'green'}`}>
-                          <i className={`bi ${act.iconColor === 'purple' ? 'bi-calendar-event' : act.iconColor === 'blue' ? 'bi-file-earmark-check' : act.iconColor === 'amber' ? 'bi-file-earmark-text' : 'bi-file-earmark-person'}`}></i>
-                        </div>
-                        <div className="urja-activity-details-v2">
-                          <div className="urja-activity-title-v2">{act.title}</div>
-                          <div className="urja-activity-sub-v2">{act.subtitle}</div>
-                        </div>
-                        <div className="urja-activity-time-v2">{act.timeAgo}</div>
+                    {activeActivities.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '32px 16px', color: '#64748b', fontSize: '0.9rem' }}>
+                        <i className="bi bi-clock-history" style={{ fontSize: '1.8rem', display: 'block', marginBottom: '8px', color: '#94a3b8' }}></i>
+                        No recent activities recorded
                       </div>
-                    ))}
+                    ) : (
+                      activeActivities.map((act) => (
+                        <div key={act.id} className="urja-activity-item-v2">
+                          <div className="urja-activity-connector-v2"></div>
+                          <div className={`urja-activity-icon-v2 ${act.iconColor || 'green'}`}>
+                            <i className={`bi ${act.iconColor === 'purple' ? 'bi-calendar-event' : act.iconColor === 'blue' ? 'bi-file-earmark-check' : act.iconColor === 'amber' ? 'bi-file-earmark-text' : 'bi-file-earmark-person'}`}></i>
+                          </div>
+                          <div className="urja-activity-details-v2">
+                            <div className="urja-activity-title-v2">{act.title}</div>
+                            <div className="urja-activity-sub-v2">{act.subtitle}</div>
+                          </div>
+                          <div className="urja-activity-time-v2">{act.timeAgo}</div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
 
@@ -1528,22 +1722,31 @@ export default function App() {
                       </tr>
                     </thead>
                     <tbody>
-                      {activeOpenRequisitions.map((req) => (
-                        <tr key={req.id}>
-                          <td className="urja-req-title-cell-v2">{req.jobTitle}</td>
-                          <td>{req.department}</td>
-                          <td>{req.location}</td>
-                          <td>
-                            <span className={`urja-status-badge-v2 ${req.status === 'Open' ? 'open' : req.status === 'In Progress' ? 'in-progress' : 'on-hold'}`}>
-                              {req.status === 'Open' && <i className="bi bi-check-circle-fill" style={{ fontSize: '0.65rem' }}></i>}
-                              {req.status}
-                            </span>
-                          </td>
-                          <td className="urja-req-candidates-v2">
-                            <i className="bi bi-people-fill"></i> {req.candidateCount}
+                      {activeOpenRequisitions.length === 0 ? (
+                        <tr>
+                          <td colSpan="5" style={{ textAlign: 'center', padding: '32px 16px', color: '#64748b', fontSize: '0.9rem' }}>
+                            <i className="bi bi-briefcase" style={{ fontSize: '1.8rem', display: 'block', marginBottom: '8px', color: '#94a3b8' }}></i>
+                            No open requisitions available
                           </td>
                         </tr>
-                      ))}
+                      ) : (
+                        activeOpenRequisitions.map((req) => (
+                          <tr key={req.id}>
+                            <td className="urja-req-title-cell-v2">{req.jobTitle}</td>
+                            <td>{req.department}</td>
+                            <td>{req.location}</td>
+                            <td>
+                              <span className={`urja-status-badge-v2 ${req.status === 'Open' ? 'open' : req.status === 'In Progress' ? 'in-progress' : 'on-hold'}`}>
+                                {req.status === 'Open' && <i className="bi bi-check-circle-fill" style={{ fontSize: '0.65rem' }}></i>}
+                                {req.status}
+                              </span>
+                            </td>
+                            <td className="urja-req-candidates-v2">
+                              <i className="bi bi-people-fill"></i> {req.candidateCount}
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -1555,29 +1758,36 @@ export default function App() {
                     <span className="urja-widget-viewall-v2" onClick={() => handleNavTab('interviews')}>View All →</span>
                   </div>
                   <div className="urja-interviews-list-v2">
-                    {activeInterviews.map((inv) => (
-                      <div key={inv.id} className="urja-interview-item-v2">
-                        <div className="urja-interview-left-v2">
-                          <div className="urja-interview-date-box-v2">
-                            <span className="urja-date-day-v2">{inv.dateDay}</span>
-                            <span className="urja-date-month-v2">{inv.dateMonth}</span>
-                          </div>
-                          <div className="urja-interview-info-v2">
-                            <span className="urja-interview-name-v2">{inv.candidateName}</span>
-                            <span className="urja-interview-role-v2">{inv.role}</span>
-                          </div>
-                        </div>
-                        <div className="urja-interview-meta-v2">
-                          <span className="urja-interview-pill-v2">
-                            <i className="bi bi-clock"></i> {inv.time}
-                          </span>
-                          <span className="urja-interview-pill-v2">
-                            <i className={`bi ${inv.mode === 'Online' ? 'bi-camera-video' : 'bi-geo-alt'}`}></i> {inv.mode}
-                          </span>
-                          <i className="bi bi-chevron-right urja-interview-arrow-v2"></i>
-                        </div>
+                    {activeInterviews.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '32px 16px', color: '#64748b', fontSize: '0.9rem' }}>
+                        <i className="bi bi-calendar-x" style={{ fontSize: '1.8rem', display: 'block', marginBottom: '8px', color: '#94a3b8' }}></i>
+                        No upcoming interviews scheduled
                       </div>
-                    ))}
+                    ) : (
+                      activeInterviews.map((inv) => (
+                        <div key={inv.id} className="urja-interview-item-v2">
+                          <div className="urja-interview-left-v2">
+                            <div className="urja-interview-date-box-v2">
+                              <span className="urja-date-day-v2">{inv.dateDay}</span>
+                              <span className="urja-date-month-v2">{inv.dateMonth}</span>
+                            </div>
+                            <div className="urja-interview-info-v2">
+                              <span className="urja-interview-name-v2">{inv.candidateName}</span>
+                              <span className="urja-interview-role-v2">{inv.role}</span>
+                            </div>
+                          </div>
+                          <div className="urja-interview-meta-v2">
+                            <span className="urja-interview-pill-v2">
+                              <i className="bi bi-clock"></i> {inv.time}
+                            </span>
+                            <span className="urja-interview-pill-v2">
+                              <i className={`bi ${inv.mode === 'Online' ? 'bi-camera-video' : 'bi-geo-alt'}`}></i> {inv.mode}
+                            </span>
+                            <i className="bi bi-chevron-right urja-interview-arrow-v2"></i>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
 
@@ -1588,41 +1798,48 @@ export default function App() {
                     <span className="urja-widget-viewall-v2" onClick={() => handleNavTab('tasks')} style={{ cursor: 'pointer' }}>View All →</span>
                   </div>
                   <div className="urja-tasks-list-v2">
-                    {activeTasks.map((tsk) => {
-                      const isDone = !!taskCompletedState[tsk.id] || tsk.completed;
-                      return (
-                        <div 
-                          key={tsk.id} 
-                          className="urja-task-row-v2"
-                          onClick={() => {
-                            const newDone = !isDone;
-                            setTaskCompletedState(prev => ({ ...prev, [tsk.id]: newDone }));
-                            const rawId = String(tsk.id).replace('tsk-', '');
-                            if (!isNaN(Number(rawId))) {
-                              const token = sessionStorage.getItem('ats_urja_token') || currentUser?.token;
-                              fetch(`http://localhost:8080/api/v1/tasks/${rawId}/status`, {
-                                method: 'PATCH',
-                                headers: {
-                                  'Content-Type': 'application/json',
-                                  'Authorization': `Bearer ${token}`
-                                },
-                                body: JSON.stringify({ status: newDone ? 'COMPLETED' : 'IN_PROGRESS' })
-                              }).then(() => showToast(`Task status updated: ${newDone ? 'COMPLETED' : 'IN_PROGRESS'}`)).catch(() => {});
-                            }
-                          }}
-                        >
-                          <div className="urja-task-left-v2">
-                            <div className={`urja-task-checkbox-v2 ${isDone ? 'checked' : ''}`}>
-                              {isDone && <i className="bi bi-check" style={{ fontSize: '0.85rem' }}></i>}
+                    {activeTasks.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '32px 16px', color: '#64748b', fontSize: '0.9rem' }}>
+                        <i className="bi bi-check2-circle" style={{ fontSize: '1.8rem', display: 'block', marginBottom: '8px', color: '#94a3b8' }}></i>
+                        No pending tasks assigned
+                      </div>
+                    ) : (
+                      activeTasks.map((tsk) => {
+                        const isDone = !!taskCompletedState[tsk.id] || tsk.completed;
+                        return (
+                          <div 
+                            key={tsk.id} 
+                            className="urja-task-row-v2"
+                            onClick={() => {
+                              const newDone = !isDone;
+                              setTaskCompletedState(prev => ({ ...prev, [tsk.id]: newDone }));
+                              const rawId = String(tsk.id).replace('tsk-', '');
+                              if (!isNaN(Number(rawId))) {
+                                const token = sessionStorage.getItem('ats_urja_token') || currentUser?.token;
+                                fetch(`http://localhost:8080/api/v1/tasks/${rawId}/status`, {
+                                  method: 'PATCH',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${token}`
+                                  },
+                                  body: JSON.stringify({ status: newDone ? 'COMPLETED' : 'IN_PROGRESS' })
+                                }).then(() => showToast(`Task status updated: ${newDone ? 'COMPLETED' : 'IN_PROGRESS'}`)).catch(() => {});
+                              }
+                            }}
+                          >
+                            <div className="urja-task-left-v2">
+                              <div className={`urja-task-checkbox-v2 ${isDone ? 'checked' : ''}`}>
+                                {isDone && <i className="bi bi-check" style={{ fontSize: '0.85rem' }}></i>}
+                              </div>
+                              <span className={`urja-task-title-v2 ${isDone ? 'done' : ''}`}>{tsk.title}</span>
                             </div>
-                            <span className={`urja-task-title-v2 ${isDone ? 'done' : ''}`}>{tsk.title}</span>
+                            <div className="urja-task-date-v2">
+                              <i className="bi bi-calendar3"></i> {tsk.dueDate}
+                            </div>
                           </div>
-                          <div className="urja-task-date-v2">
-                            <i className="bi bi-calendar3"></i> {tsk.dueDate}
-                          </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })
+                    )}
                   </div>
                 </div>
               </div>
@@ -1640,7 +1857,7 @@ export default function App() {
                   requisition={viewingReq}
                   onClose={() => setViewingReq(null)}
                   onAssignRecruiter={(r) => { showToast(`Recruiter assigned to ${r.code}`); }}
-                  onOpenApproval={(r) => { setActiveTab('approvals'); }}
+                  onOpenApproval={(r) => { handleNavTab('approvals'); }}
                 />
               ) : (
                 /* Screen 3: Job Requisitions List */
@@ -1666,7 +1883,7 @@ export default function App() {
                   setRowsPerPage={setRowsPerPage}
                   onViewRequisition={(req) => setViewingReq(req)}
                   onCreateRequisition={() => setShowReqModal(true)}
-                  onOpenApproval={() => setActiveTab('approvals')}
+                  onOpenApproval={() => handleNavTab('approvals')}
                   onEditRequisition={(req) => showToast(`Edit form opened for ${req.code}`)}
                 />
               )}
@@ -1682,8 +1899,11 @@ export default function App() {
               {selectedCandidate ? (
                 <CandidateProfileResume 
                   candidate={selectedCandidate}
+                  currentUser={currentUser}
+                  showToast={showToast}
+                  onCandidateUpdated={(updated) => setSelectedCandidate(updated)}
                   onClose={() => setSelectedCandidate(null)}
-                  onScheduleInterview={(c) => { setActiveTab('interviews'); }}
+                  onScheduleInterview={(c) => { handleNavTab('interviews'); }}
                   onAddFeedback={(c) => { setFeedbackCandidate(c); setShowFeedbackModal(true); }}
                 />
               ) : (
@@ -1693,7 +1913,7 @@ export default function App() {
                   requisitions={requisitions}
                   departments={INITIAL_DEPARTMENTS}
                   onViewCandidate={(c) => setSelectedCandidate(c)}
-                  onScheduleInterview={(c) => { setActiveTab('interviews'); }}
+                  onScheduleInterview={(c) => { handleNavTab('interviews'); }}
                   showToast={showToast}
                 />
               )}
@@ -1861,11 +2081,6 @@ export default function App() {
                         {isCurrentMonth && (
                           <>
                             <span className="urja-calendar-day-num">{dayNum}</span>
-                            {dayNum === 10 && <div className="urja-calendar-event-tag blue">Amit Shah Applied</div>}
-                            {dayNum === 15 && <div className="urja-calendar-event-tag green">Amol Shinde Joined</div>}
-                            {dayNum === 20 && <div className="urja-calendar-event-tag orange">Interview: Amit Shah</div>}
-                            {dayNum === 21 && <div className="urja-calendar-event-tag blue">Interview: Karan Mehta</div>}
-                            {dayNum === 25 && <div className="urja-calendar-event-tag purple">Offer Deadline</div>}
                           </>
                         )}
                       </div>
@@ -2044,6 +2259,30 @@ export default function App() {
       {/* ==============================================================================
           MODALS & OVERLAYS
           ============================================================================== */}
+
+      {/* PRIVILEGED ADMIN HIGH-SECURITY PASSWORD CHANGE MODAL (HR ADMIN & IT ADMIN) */}
+      <AdminPasswordChangeModal 
+        isOpen={showAdminPasswordModal}
+        onClose={() => setShowAdminPasswordModal(false)}
+        currentUser={currentUser}
+        showToast={showToast}
+        onSuccess={() => {
+          showToast('Password changed successfully. Please keep your credentials secure.');
+        }}
+      />
+
+      {/* AUTHENTICATED USER PROFILE MODAL */}
+      <UserProfileModal 
+        isOpen={showUserProfileModal}
+        onClose={() => setShowUserProfileModal(false)}
+        currentUser={currentUser}
+        onProfileUpdated={(updated) => {
+          setCurrentUser(prev => ({ ...prev, ...updated }));
+          showToast('Profile updated successfully.');
+        }}
+        onChangePasswordClick={() => setShowAdminPasswordModal(true)}
+        onSignOut={handleSignOut}
+      />
 
       {/* SCREEN 4: CREATE REQUISITION 3-STEP WIZARD */}
       {showReqModal && (

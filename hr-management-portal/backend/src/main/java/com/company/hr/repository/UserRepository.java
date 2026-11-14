@@ -19,8 +19,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT u FROM User u JOIN u.roles r WHERE r.roleName = :roleName AND u.status = 'ACTIVE'")
     List<User> findActiveUsersByRole(@Param("roleName") String roleName);
 
-    @Query("SELECT DISTINCT u FROM User u JOIN u.roles r WHERE u.status = 'ACTIVE' AND r.roleName IN ('ROLE_INTERVIEWER', 'ROLE_DEPT_HEAD', 'ROLE_APPROVING_MANAGER', 'ROLE_HR_ADMIN', 'ROLE_HRBP')")
+    @Query("SELECT DISTINCT u FROM User u LEFT JOIN FETCH u.roles WHERE u.status = com.company.hr.entity.User.UserStatus.ACTIVE ORDER BY u.name ASC")
     List<User> findEligibleInterviewers();
+
+    @Query("SELECT DISTINCT u FROM User u LEFT JOIN FETCH u.roles WHERE u.status = com.company.hr.entity.User.UserStatus.ACTIVE ORDER BY u.name ASC")
+    List<User> findActiveUsersForInterviewAssignment();
 
     long countByStatus(User.UserStatus status);
 }

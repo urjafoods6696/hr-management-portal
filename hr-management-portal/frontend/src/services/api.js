@@ -281,6 +281,19 @@ export const userService = {
     const response = await api.get('/api/users/me');
     const body = response.data;
     return body.data || body;
+  },
+
+  async updateCurrentUserProfile(profileData) {
+    const response = await api.put('/api/users/me', profileData);
+    const body = response.data;
+    const updated = body.data || body;
+    try {
+      const currentStored = getStoredUser() || {};
+      const merged = { ...currentStored, ...updated };
+      sessionStorage.setItem(USER_STORAGE_KEY, JSON.stringify(merged));
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(merged));
+    } catch (e) {}
+    return updated;
   }
 };
 
@@ -302,6 +315,58 @@ export const authService = {
 
   async getCurrentUser() {
     const response = await api.get('/api/v1/auth/me');
+    const body = response.data;
+    return body.data || body;
+  },
+
+  async updateCurrentUserProfile(profileData) {
+    const response = await api.put('/api/v1/auth/me', profileData);
+    const body = response.data;
+    const updated = body.data || body;
+    try {
+      const currentStored = getStoredUser() || {};
+      const merged = { ...currentStored, ...updated };
+      sessionStorage.setItem(USER_STORAGE_KEY, JSON.stringify(merged));
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(merged));
+    } catch (e) {}
+    return updated;
+  },
+
+  async forgotPassword(email) {
+    const response = await api.post('/api/v1/auth/forgot-password', { email });
+    const body = response.data;
+    return body.data || body;
+  },
+
+  async resetPassword(token, newPassword) {
+    const response = await api.post('/api/v1/auth/reset-password', {
+      token,
+      newPassword
+    });
+    const body = response.data;
+    return body.data || body;
+  },
+
+  // Admin Password Security with Email OTP (HR Admin & IT Admin)
+  async requestAdminPasswordOtp(email) {
+    const response = await api.post('/api/v1/auth/admin-password/request-otp', { email });
+    const body = response.data;
+    return body.data || body;
+  },
+
+  async verifyAdminPasswordOtp(email, otp) {
+    const response = await api.post('/api/v1/auth/admin-password/verify-otp', { email, otp });
+    const body = response.data;
+    return body.data || body;
+  },
+
+  async resetAdminPassword(email, resetToken, newPassword, confirmPassword) {
+    const response = await api.post('/api/v1/auth/admin-password/reset', {
+      email,
+      resetToken,
+      newPassword,
+      confirmPassword
+    });
     const body = response.data;
     return body.data || body;
   },

@@ -19,12 +19,14 @@ public class CandidateDocument {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @com.fasterxml.jackson.annotation.JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "candidate_id", nullable = false)
     private Candidate candidate;
 
+    @com.fasterxml.jackson.annotation.JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "requisition_id", nullable = false)
+    @JoinColumn(name = "requisition_id", nullable = true)
     private Requisition requisition;
 
     @Enumerated(EnumType.STRING)
@@ -39,6 +41,9 @@ public class CandidateDocument {
 
     @Column(name = "file_size_bytes", nullable = false)
     private Long fileSizeBytes;
+
+    @Column(name = "extracted_text", columnDefinition = "LONGTEXT")
+    private String extractedText;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

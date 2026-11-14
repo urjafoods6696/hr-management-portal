@@ -40,254 +40,8 @@ const formatTime = (dateStr) => {
   }
 };
 
-// Fallback reference data matching screenshot exactly
-const REFERENCE_FALLBACK_APPROVALS = [
-  {
-    id: 1,
-    approvalCode: 'APP-2026-001',
-    approvalType: 'OFFER_APPROVAL',
-    entityType: 'OFFER',
-    entityId: 1,
-    title: 'Offer Approval',
-    subtitle: 'Amit Patil | Software Engineer | Pune',
-    department: 'IT',
-    location: 'Pune',
-    priority: 'HIGH',
-    status: 'PENDING',
-    requesterName: 'Sneha Shah',
-    requesterRole: 'Recruiter',
-    requesterAvatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150',
-    requestDate: '2026-10-10T10:30:00',
-    candidateName: 'Amit Patil',
-    candidateEmail: 'amit.patil@gmail.com',
-    candidatePhone: '+91 98765 43210',
-    candidateAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-    jobTitle: 'Software Engineer',
-    openings: 1,
-    justification: 'Selected after 2 technical rounds and managerial review for backend core API integration.',
-    targetJoiningDate: '2026-11-01',
-    offerDate: '2026-10-10',
-    proposedJoiningDate: '2026-11-01',
-    ctcFixed: 550000,
-    ctcVariable: 170000,
-    ctcTotal: 720000,
-    offerLetterUrl: '/documents/offers/URJ-OFF-2026-001.pdf',
-    canApprove: true,
-    canReject: true,
-    canReturn: true,
-    canAddComment: true,
-    detailsJson: '{"workflow": [{"step": "Offer Created", "date": "10 Oct 2026, 10:20 AM", "user": "Sneha Shah", "status": "COMPLETED"}, {"step": "Pending Approval", "date": "10 Oct 2026, 10:30 AM", "user": "Awaiting your approval", "status": "PENDING"}, {"step": "Offer Sent", "date": "Pending", "user": "", "status": "WAITING"}, {"step": "Accepted / Declined", "date": "Pending", "user": "", "status": "WAITING"}]}',
-    comments: [
-      { id: 1, userName: 'Sneha Shah', userRole: 'Recruiter', comment: 'Candidate has accepted all preliminary compensation terms. Fast-track approval requested.', createdAt: '2026-10-10T10:25:00' }
-    ]
-  },
-  {
-    id: 2,
-    approvalCode: 'APP-2026-002',
-    approvalType: 'REQUISITION_APPROVAL',
-    entityType: 'REQUISITION',
-    entityId: 25,
-    title: 'Job Requisition',
-    subtitle: 'JR-2026-015 | Plant Operator | Rahuri',
-    department: 'Plant Operations',
-    location: 'Rahuri',
-    priority: 'HIGH',
-    status: 'PENDING',
-    requesterName: 'Vikram Desai',
-    requesterRole: 'Hiring Manager',
-    requesterAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150',
-    requestDate: '2026-10-09T16:15:00',
-    jobTitle: 'Plant Operator',
-    openings: 2,
-    justification: 'Urgent replacement for plant expansion in solvent extraction unit 2. Requires certified boiler and silo operator.',
-    targetJoiningDate: '2026-11-15',
-    ctcFixed: 350000,
-    ctcVariable: 50000,
-    ctcTotal: 400000,
-    canApprove: true,
-    canReject: true,
-    canReturn: true,
-    canAddComment: true,
-    detailsJson: '{"workflow": [{"step": "Requisition Submitted", "date": "09 Oct 2026, 04:10 PM", "user": "Vikram Desai", "status": "COMPLETED"}, {"step": "HR Review & Budget Approval", "date": "09 Oct 2026, 04:15 PM", "user": "Awaiting your approval", "status": "PENDING"}, {"step": "Senior Management Sanction", "date": "Pending", "user": "Siddharth Mehta (VP)", "status": "WAITING"}, {"step": "Recruiter Assignment", "date": "Pending", "user": "", "status": "WAITING"}]}',
-    comments: [
-      { id: 2, userName: 'Vikram Desai', userRole: 'Hiring Manager', comment: 'Urgent replacement needed before next week harvest season begins.', createdAt: '2026-10-09T16:12:00' }
-    ]
-  },
-  {
-    id: 3,
-    approvalCode: 'APP-2026-003',
-    approvalType: 'OFFER_APPROVAL',
-    entityType: 'OFFER',
-    entityId: 2,
-    title: 'Offer Approval',
-    subtitle: 'Neha Joshi | HR Executive | Mumbai',
-    department: 'Human Resources',
-    location: 'Mumbai',
-    priority: 'MEDIUM',
-    status: 'PENDING',
-    requesterName: 'Rahul More',
-    requesterRole: 'Recruiter',
-    requesterAvatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
-    requestDate: '2026-10-09T11:20:00',
-    candidateName: 'Neha Joshi',
-    candidateEmail: 'neha.joshi@gmail.com',
-    candidatePhone: '+91 98221 44552',
-    candidateAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-    jobTitle: 'HR Executive',
-    openings: 1,
-    justification: 'Final candidate selected for employee onboarding and statutory compliance handling at Mumbai Corporate Office.',
-    targetJoiningDate: '2026-10-25',
-    offerDate: '2026-10-09',
-    proposedJoiningDate: '2026-10-25',
-    ctcFixed: 600000,
-    ctcVariable: 80000,
-    ctcTotal: 680000,
-    offerLetterUrl: '/documents/offers/URJ-OFF-2026-002.pdf',
-    canApprove: true,
-    canReject: true,
-    canReturn: true,
-    canAddComment: true,
-    detailsJson: '{"workflow": [{"step": "Offer Created", "date": "09 Oct 2026, 11:10 AM", "user": "Rahul More", "status": "COMPLETED"}, {"step": "Pending Approval", "date": "09 Oct 2026, 11:20 AM", "user": "Awaiting your approval", "status": "PENDING"}, {"step": "Offer Sent", "date": "Pending", "user": "", "status": "WAITING"}, {"step": "Accepted / Declined", "date": "Pending", "user": "", "status": "WAITING"}]}',
-    comments: []
-  },
-  {
-    id: 4,
-    approvalCode: 'APP-2026-004',
-    approvalType: 'HIRING_APPROVAL',
-    entityType: 'CANDIDATE',
-    entityId: 103,
-    title: 'Hiring Approval',
-    subtitle: 'QA Analyst Hiring | Quality | Pune',
-    department: 'Quality',
-    location: 'Pune',
-    priority: 'MEDIUM',
-    status: 'PENDING',
-    requesterName: 'Anita Kulkarni',
-    requesterRole: 'Department Head',
-    requesterAvatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150',
-    requestDate: '2026-10-08T14:10:00',
-    candidateName: 'Pooja Kale',
-    candidateEmail: 'pooja.kale@gmail.com',
-    candidatePhone: '+91 98221 44558',
-    candidateAvatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150',
-    jobTitle: 'QA Analyst',
-    openings: 1,
-    justification: 'Final selection approval for QA Analyst after technical assessment. Score: 4.8/5. Ready for offer generation.',
-    targetJoiningDate: '2026-11-05',
-    ctcFixed: 480000,
-    ctcVariable: 70000,
-    ctcTotal: 550000,
-    canApprove: true,
-    canReject: true,
-    canReturn: true,
-    canAddComment: true,
-    detailsJson: '{"workflow": [{"step": "Interview Rounds Completed", "date": "08 Oct 2026, 01:30 PM", "user": "Panel Rating 4.8/5", "status": "COMPLETED"}, {"step": "HOD Hiring Recommendation", "date": "08 Oct 2026, 02:10 PM", "user": "Anita Kulkarni", "status": "COMPLETED"}, {"step": "HR Signoff", "date": "08 Oct 2026, 02:10 PM", "user": "Awaiting your approval", "status": "PENDING"}, {"step": "Offer Generation", "date": "Pending", "user": "", "status": "WAITING"}]}',
-    comments: [
-      { id: 3, userName: 'Anita Kulkarni', userRole: 'Department Head', comment: 'Strong technical scores in QA automation and food safety protocols.', createdAt: '2026-10-08T14:15:00' }
-    ]
-  },
-  {
-    id: 5,
-    approvalCode: 'APP-2026-005',
-    approvalType: 'OFFER_APPROVAL',
-    entityType: 'OFFER',
-    entityId: 4,
-    title: 'Offer Approval',
-    subtitle: 'Rahul More | Production Engineer | Shirdi',
-    department: 'Production',
-    location: 'Shirdi',
-    priority: 'LOW',
-    status: 'PENDING',
-    requesterName: 'Sneha Shah',
-    requesterRole: 'Recruiter',
-    requesterAvatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150',
-    requestDate: '2026-10-07T17:40:00',
-    candidateName: 'Rahul More',
-    candidateEmail: 'rahul.more@gmail.com',
-    candidatePhone: '+91 98221 44553',
-    candidateAvatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150',
-    jobTitle: 'Production Engineer',
-    openings: 1,
-    justification: 'Selected for Shirdi Feed Mill operation and extruder shift management.',
-    targetJoiningDate: '2026-11-01',
-    offerDate: '2026-10-07',
-    proposedJoiningDate: '2026-11-01',
-    ctcFixed: 480000,
-    ctcVariable: 60000,
-    ctcTotal: 540000,
-    offerLetterUrl: '/documents/offers/URJ-OFF-2026-004.pdf',
-    canApprove: true,
-    canReject: true,
-    canReturn: true,
-    canAddComment: true,
-    detailsJson: '{"workflow": [{"step": "Offer Created", "date": "07 Oct 2026, 05:25 PM", "user": "Sneha Shah", "status": "COMPLETED"}, {"step": "Pending Approval", "date": "07 Oct 2026, 05:40 PM", "user": "Awaiting your approval", "status": "PENDING"}, {"step": "Offer Sent", "date": "Pending", "user": "", "status": "WAITING"}, {"step": "Accepted / Declined", "date": "Pending", "user": "", "status": "WAITING"}]}',
-    comments: []
-  },
-  {
-    id: 6,
-    approvalCode: 'APP-2026-006',
-    approvalType: 'REQUISITION_APPROVAL',
-    entityType: 'REQUISITION',
-    entityId: 23,
-    title: 'Job Requisition',
-    subtitle: 'JR-2026-014 | Quality Analyst | Pune',
-    department: 'Quality',
-    location: 'Pune',
-    priority: 'MEDIUM',
-    status: 'PENDING',
-    requesterName: 'Sandeep Jadhav',
-    requesterRole: 'Plant Head',
-    requesterAvatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150',
-    requestDate: '2026-10-06T13:25:00',
-    jobTitle: 'Quality Analyst',
-    openings: 1,
-    justification: 'Headcount expansion for upcoming FSSAI and HACCP quality certifications.',
-    targetJoiningDate: '2026-11-20',
-    ctcFixed: 450000,
-    ctcVariable: 50000,
-    ctcTotal: 500000,
-    canApprove: true,
-    canReject: true,
-    canReturn: true,
-    canAddComment: true,
-    detailsJson: '{"workflow": [{"step": "Requisition Submitted", "date": "06 Oct 2026, 01:15 PM", "user": "Sandeep Jadhav", "status": "COMPLETED"}, {"step": "HR Review & Budget Approval", "date": "06 Oct 2026, 01:25 PM", "user": "Awaiting your approval", "status": "PENDING"}, {"step": "Senior Management Sanction", "date": "Pending", "user": "Siddharth Mehta (VP)", "status": "WAITING"}, {"step": "Recruiter Assignment", "date": "Pending", "user": "", "status": "WAITING"}]}',
-    comments: []
-  },
-  {
-    id: 7,
-    approvalCode: 'APP-2026-007',
-    approvalType: 'OTHER_APPROVAL',
-    entityType: 'BACKGROUND_CHECK',
-    entityId: 105,
-    title: 'Background Check',
-    subtitle: 'Vikram Desai | Plant Operator | Rahuri',
-    department: 'Operations',
-    location: 'Rahuri',
-    priority: 'LOW',
-    status: 'PENDING',
-    requesterName: 'Priyanka Deshmukh',
-    requesterRole: 'HR Executive',
-    requesterAvatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150',
-    requestDate: '2026-10-06T11:50:00',
-    candidateName: 'Vikram Desai',
-    candidateEmail: 'vikram.desai@gmail.com',
-    candidatePhone: '+91 98221 44555',
-    candidateAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150',
-    jobTitle: 'Plant Operator',
-    openings: 1,
-    justification: 'Third-party BGV clearance report submitted by AuthBridge verification team. Educational and criminal checks verified clear. Awaiting final sign-off.',
-    targetJoiningDate: '2026-10-25',
-    ctcFixed: 350000,
-    ctcVariable: 30000,
-    ctcTotal: 380000,
-    canApprove: true,
-    canReject: true,
-    canReturn: true,
-    canAddComment: true,
-    detailsJson: '{"workflow": [{"step": "BGV Initiated", "date": "02 Oct 2026, 10:00 AM", "user": "Priyanka Deshmukh", "status": "COMPLETED"}, {"step": "Agency Report Received", "date": "06 Oct 2026, 11:30 AM", "user": "AuthBridge Team", "status": "COMPLETED"}, {"step": "HR Signoff", "date": "06 Oct 2026, 11:50 AM", "user": "Awaiting your approval", "status": "PENDING"}, {"step": "Final Clear Gate", "date": "Pending", "user": "", "status": "WAITING"}]}',
-    comments: []
-  }
-];
+// Clean production initial state
+const REFERENCE_FALLBACK_APPROVALS = [];
 
 const API_BASE = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
   ? 'http://localhost:8080'
@@ -308,15 +62,15 @@ export default function ApprovalsInboxView({
 
   // 1. Stats State
   const [stats, setStats] = useState({
-    pendingApprovals: 7,
-    approvedToday: 4,
-    rejectedToday: 1,
-    myApprovals: 12,
-    allCount: 7,
-    offerApprovalsCount: 3,
-    requisitionApprovalsCount: 2,
-    hiringApprovalsCount: 1,
-    otherApprovalsCount: 1
+    pendingApprovals: 0,
+    approvedToday: 0,
+    rejectedToday: 0,
+    myApprovals: 0,
+    allCount: 0,
+    offerApprovalsCount: 0,
+    requisitionApprovalsCount: 0,
+    hiringApprovalsCount: 0,
+    otherApprovalsCount: 0
   });
 
   // 2. Active Tab State
@@ -332,8 +86,8 @@ export default function ApprovalsInboxView({
   const [appliedSearch, setAppliedSearch] = useState('');
 
   // 4. Table & Pagination State
-  const [approvalsList, setApprovalsList] = useState(REFERENCE_FALLBACK_APPROVALS);
-  const [totalRecords, setTotalRecords] = useState(7);
+  const [approvalsList, setApprovalsList] = useState([]);
+  const [totalRecords, setTotalRecords] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [isLoading, setIsLoading] = useState(false);
@@ -612,6 +366,9 @@ export default function ApprovalsInboxView({
         if (typeof onApprovalSuccess === 'function') {
           onApprovalSuccess(updated.id);
         }
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('urja_approvals_updated', { detail: { id: updated.id } }));
+        }
 
         // Refresh database summary stats & current page list
         fetchSummaryStats();
@@ -660,8 +417,11 @@ export default function ApprovalsInboxView({
     setModalError(null);
 
     if (typeof onApprovalSuccess === 'function') {
-      onApprovalSuccess(updated.id);
-    }
+          onApprovalSuccess(updated.id);
+        }
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('urja_approvals_updated', { detail: { id: updated.id } }));
+        }
 
     onToast(decision === 'APPROVED' 
       ? 'Offer approval confirmed successfully!' 
@@ -837,35 +597,35 @@ export default function ApprovalsInboxView({
           className={`urja-approval-tab ${activeTab === 'ALL' ? 'active' : ''}`}
           onClick={() => { setActiveTab('ALL'); setCurrentPage(1); }}
         >
-          All <span className="urja-tab-count-badge">({stats.allCount || 7})</span>
+          All <span className="urja-tab-count-badge">({stats.allCount ?? 0})</span>
         </button>
 
         <button
           className={`urja-approval-tab ${activeTab === 'OFFER' ? 'active' : ''}`}
           onClick={() => { setActiveTab('OFFER'); setCurrentPage(1); }}
         >
-          Offer Approvals <span className="urja-tab-count-badge">({stats.offerApprovalsCount || 3})</span>
+          Offer Approvals <span className="urja-tab-count-badge">({stats.offerApprovalsCount ?? 0})</span>
         </button>
 
         <button
           className={`urja-approval-tab ${activeTab === 'REQUISITION' ? 'active' : ''}`}
           onClick={() => { setActiveTab('REQUISITION'); setCurrentPage(1); }}
         >
-          Requisition Approvals <span className="urja-tab-count-badge">({stats.requisitionApprovalsCount || 2})</span>
+          Requisition Approvals <span className="urja-tab-count-badge">({stats.requisitionApprovalsCount ?? 0})</span>
         </button>
 
         <button
           className={`urja-approval-tab ${activeTab === 'HIRING' ? 'active' : ''}`}
           onClick={() => { setActiveTab('HIRING'); setCurrentPage(1); }}
         >
-          Hiring Approvals <span className="urja-tab-count-badge">({stats.hiringApprovalsCount || 1})</span>
+          Hiring Approvals <span className="urja-tab-count-badge">({stats.hiringApprovalsCount ?? 0})</span>
         </button>
 
         <button
           className={`urja-approval-tab ${activeTab === 'OTHER' ? 'active' : ''}`}
           onClick={() => { setActiveTab('OTHER'); setCurrentPage(1); }}
         >
-          Other Approvals <span className="urja-tab-count-badge">({stats.otherApprovalsCount || 1})</span>
+          Other Approvals <span className="urja-tab-count-badge">({stats.otherApprovalsCount ?? 0})</span>
         </button>
       </div>
 

@@ -22,5 +22,6 @@ public class EligibleInterviewerResponse {
     private String department;
     private String status;
     private List<String> roles;
+    private String systemRole;
     private boolean eligible;
 }

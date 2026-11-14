@@ -10,15 +10,26 @@ export default function LoginPage({ onLoginSuccess }) {
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Password Recovery States
   const [showForgotModal, setShowForgotModal] = useState(false);
+  const [forgotStep, setForgotStep] = useState('request'); // 'request' | 'reset' | 'success'
   const [forgotEmail, setForgotEmail] = useState('');
-  const [forgotSent, setForgotSent] = useState(false);
+  const [isForgotLoading, setIsForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState('');
+  const [forgotInfo, setForgotInfo] = useState('');
+  const [resetToken, setResetToken] = useState('');
+  const [resetCode, setResetCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [emailSentStatus, setEmailSentStatus] = useState(false);
 
   // Guarantee fields and storage are reset whenever the login page mounts/refreshes
   useEffect(() => {
     try {
       localStorage.removeItem('ats_urja_saved_email');
-      
     } catch (e) {}
     setEmail('');
     setPassword('');
@@ -30,6 +41,19 @@ export default function LoginPage({ onLoginSuccess }) {
       if (emailInput) emailInput.removeAttribute('readonly');
       if (passInput) passInput.removeAttribute('readonly');
     }, 400);
+
+    // Check if user came from a reset password link (e.g. ?resetToken=...)
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlToken = urlParams.get('resetToken');
+      if (urlToken) {
+        setShowForgotModal(true);
+        setForgotStep('reset');
+        setResetToken(urlToken);
+        setResetCode(urlToken);
+        setForgotInfo('Please set your new account password below.');
+      }
+    }
 
     return () => clearTimeout(timer);
   }, []);
@@ -66,6 +90,95 @@ export default function LoginPage({ onLoginSuccess }) {
     }
   };
 
+  const handleOpenForgot = () => {
+    setShowForgotModal(true);
+    setForgotStep('request');
+    setForgotEmail(email ? email.trim() : '');
+    setForgotError('');
+    setForgotInfo('');
+    setResetCode('');
+    setResetToken('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setEmailSentStatus(false);
+  };
+
+  const handleCloseForgot = () => {
+    setShowForgotModal(false);
+    setForgotError('');
+    setForgotInfo('');
+    if (typeof window !== 'undefined' && window.location.search.includes('resetToken')) {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  };
+
+  const handleRequestReset = async (e) => {
+    if (e) e.preventDefault();
+    if (!forgotEmail || !forgotEmail.trim()) {
+      setForgotError('Please enter your registered work email or username.');
+      return;
+    }
+
+    setIsForgotLoading(true);
+    setForgotError('');
+    setForgotInfo('');
+
+    try {
+      const res = await authService.forgotPassword(forgotEmail.trim());
+      setIsForgotLoading(false);
+      setEmailSentStatus(res.emailSent);
+      setResetToken(res.resetToken || '');
+      setResetCode(res.resetCode || '');
+
+      if (res.emailSent) {
+        setForgotInfo(`A password reset verification email has been dispatched to ${res.email || forgotEmail.trim()}. Please enter your 6-digit verification code below.`);
+      } else {
+        setForgotInfo(`Notice: External corporate SMTP delivery is not configured on this host. Your 6-digit verification code is generated below for instant password reset.`);
+      }
+      setForgotStep('reset');
+    } catch (err) {
+      setIsForgotLoading(false);
+      const msg = err.response?.data?.message || err.message;
+      setForgotError(msg || 'No account found with this email. Please check your credentials.');
+    }
+  };
+
+  const handleConfirmReset = async (e) => {
+    if (e) e.preventDefault();
+    const tokenToUse = resetCode.trim() || resetToken.trim();
+    if (!tokenToUse) {
+      setForgotError('Please enter your 6-digit verification code or reset token.');
+      return;
+    }
+
+    if (!newPassword || newPassword.length < 6) {
+      setForgotError('New password must be at least 6 characters long.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setForgotError('Passwords do not match. Please ensure both passwords match.');
+      return;
+    }
+
+    setIsForgotLoading(true);
+    setForgotError('');
+
+    try {
+      await authService.resetPassword(tokenToUse, newPassword);
+      setIsForgotLoading(false);
+      setForgotStep('success');
+      if (forgotEmail) {
+        setEmail(forgotEmail.trim());
+      }
+      setPassword(newPassword);
+    } catch (err) {
+      setIsForgotLoading(false);
+      const msg = err.response?.data?.message || err.message;
+      setForgotError(msg || 'Failed to update password. Verification code may be invalid or expired.');
+    }
+  };
+
   return (
     <div className="urja-login-viewport">
       
@@ -95,10 +208,10 @@ export default function LoginPage({ onLoginSuccess }) {
           </div>
         </div>
 
-        {/* Diagonal Glowing Lime Divider Line */}
+        {/* Diagonal Glowing Lime Divider Line - exactly matches urja-left-panel edge (38.4% to 48.0%) */}
         <div className="urja-diagonal-divider-svg">
           <svg viewBox="0 0 1000 1000" preserveAspectRatio="none">
-            <line x1="365" y1="0" x2="515" y2="1000" stroke="#84d623" strokeWidth="4" />
+            <line x1="384" y1="0" x2="480" y2="1000" stroke="#84d623" strokeWidth="4" />
           </svg>
         </div>
 
@@ -265,9 +378,9 @@ export default function LoginPage({ onLoginSuccess }) {
                 <input type="password" name="prevent_autofill_password" tabIndex={-1} autoComplete="new-password" />
               </div>
               
-              {/* Work Email Field */}
+              {/* Work Email / Username Field */}
               <div className="urja-form-group">
-                <label htmlFor="workEmail" className="urja-field-label">Work Email</label>
+                <label htmlFor="workEmail" className="urja-field-label">Work Email or Username</label>
                 <div className="urja-input-wrapper">
                   <div className="input-icon-left">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -278,13 +391,13 @@ export default function LoginPage({ onLoginSuccess }) {
                   <input
                     id="workEmail"
                     name="workEmail"
-                    type="email"
+                    type="text"
                     className="urja-clean-input"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     onFocus={(e) => e.target.removeAttribute('readonly')}
                     readOnly
-                    placeholder="Enter your work email"
+                    placeholder="Enter work email or username"
                     autoComplete="off"
                     required
                   />
@@ -350,8 +463,9 @@ export default function LoginPage({ onLoginSuccess }) {
 
                 <button
                   type="button"
+                  id="forgotPasswordBtn"
                   className="forgot-link-btn"
-                  onClick={() => { setShowForgotModal(true); setForgotEmail(email); setForgotSent(false); }}
+                  onClick={handleOpenForgot}
                 >
                   Forgot Password?
                 </button>
@@ -398,46 +512,176 @@ export default function LoginPage({ onLoginSuccess }) {
 
       {/* Forgot Password Modal Dialog */}
       {showForgotModal && (
-        <div className="urja-modal-backdrop" onClick={() => setShowForgotModal(false)}>
+        <div className="urja-modal-backdrop" onClick={handleCloseForgot}>
           <div className="urja-modal-box-white" onClick={(e) => e.stopPropagation()}>
             <div className="urja-modal-header-clean">
-              <h4>Reset Your Password</h4>
-              <button className="urja-close-modal-btn" onClick={() => setShowForgotModal(false)}>✕</button>
+              <h4>
+                {forgotStep === 'request' && 'Reset Your Password'}
+                {forgotStep === 'reset' && 'Enter Verification Code'}
+                {forgotStep === 'success' && 'Password Reset Complete'}
+              </h4>
+              <button className="urja-close-modal-btn" onClick={handleCloseForgot} aria-label="Close modal">✕</button>
             </div>
+            
             <div className="urja-modal-body-clean">
-              {forgotSent ? (
-                <div className="urja-modal-success-state">
-                  <div className="success-icon-badge">✓</div>
-                  <h5>Password Reset Dispatched</h5>
-                  <p>A secure temporary reset link has been dispatched to <strong>{forgotEmail}</strong>. Please verify your Urja corporate inbox.</p>
-                  <button className="urja-green-submit-btn" style={{ marginTop: '1rem' }} onClick={() => setShowForgotModal(false)}>Done</button>
+              {forgotError && (
+                <div className="urja-modal-alert-error">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                  </svg>
+                  <span>{forgotError}</span>
                 </div>
-              ) : (
-                <div>
+              )}
+
+              {/* STEP 1: Request Password Reset */}
+              {forgotStep === 'request' && (
+                <form onSubmit={handleRequestReset}>
                   <p className="forgot-modal-desc">
-                    Enter your registered Urja official work email. Our Active Directory service will send password restoration instructions.
+                    Enter your registered official work email or username. We will generate your 6-digit verification code to reset your account credentials securely.
                   </p>
+                  
                   <div className="urja-form-group" style={{ marginBottom: '1.25rem' }}>
-                    <label className="urja-field-label">Official Work Email</label>
+                    <label className="urja-field-label">Official Work Email / Username</label>
                     <input
-                      type="email"
+                      type="text"
                       className="urja-clean-input"
                       value={forgotEmail}
                       onChange={(e) => setForgotEmail(e.target.value)}
-                      placeholder="name@urjafoods.com"
+                      placeholder="e.g. priyanka@urjafoods.com or priyanka"
+                      required
+                      autoFocus
                     />
                   </div>
-                  <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-                    <button type="button" className="urja-ghost-btn" onClick={() => setShowForgotModal(false)}>Cancel</button>
+
+                  <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                    <button type="button" className="urja-ghost-btn" onClick={handleCloseForgot} disabled={isForgotLoading}>
+                      Cancel
+                    </button>
                     <button
-                      type="button"
+                      type="submit"
                       className="urja-green-submit-btn"
                       style={{ width: 'auto', padding: '0.6rem 1.4rem' }}
-                      onClick={() => setForgotSent(true)}
+                      disabled={isForgotLoading}
                     >
-                      Send Reset Instructions
+                      {isForgotLoading ? 'Sending...' : 'Request Verification Code'}
                     </button>
                   </div>
+                </form>
+              )}
+
+              {/* STEP 2: Enter Verification Code & New Password */}
+              {forgotStep === 'reset' && (
+                <form onSubmit={handleConfirmReset}>
+                  {forgotInfo && (
+                    <div className="urja-modal-alert-info">
+                      {forgotInfo}
+                    </div>
+                  )}
+
+                  {!emailSentStatus && resetCode && (
+                    <div className="urja-otp-display-box">
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', marginBottom: '0.25rem' }}>
+                        Verification Code (OTP)
+                      </div>
+                      <div className="urja-otp-code-text">{resetCode}</div>
+                      <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.25rem' }}>
+                        Valid for 15 minutes. Automatically populated below.
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="urja-form-group" style={{ marginBottom: '0.85rem' }}>
+                    <label className="urja-field-label">6-Digit Verification Code</label>
+                    <input
+                      type="text"
+                      className="urja-clean-input"
+                      value={resetCode}
+                      onChange={(e) => setResetCode(e.target.value)}
+                      placeholder="Enter 6-digit code or paste token"
+                      required
+                    />
+                  </div>
+
+                  <div className="urja-form-group" style={{ marginBottom: '0.85rem' }}>
+                    <label className="urja-field-label">New Password</label>
+                    <div className="urja-password-field-wrap">
+                      <input
+                        type={showNewPassword ? 'text' : 'password'}
+                        className="urja-clean-input"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="At least 6 characters"
+                        required
+                      />
+                      <button
+                        type="button"
+                        className="urja-password-toggle-btn"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                      >
+                        {showNewPassword ? 'Hide' : 'Show'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="urja-form-group" style={{ marginBottom: '1.25rem' }}>
+                    <label className="urja-field-label">Confirm New Password</label>
+                    <div className="urja-password-field-wrap">
+                      <input
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        className="urja-clean-input"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="Repeat new password"
+                        required
+                      />
+                      <button
+                        type="button"
+                        className="urja-password-toggle-btn"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      >
+                        {showConfirmPassword ? 'Hide' : 'Show'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                    <button type="button" className="urja-ghost-btn" onClick={() => setForgotStep('request')} disabled={isForgotLoading}>
+                      Back
+                    </button>
+                    <button
+                      type="submit"
+                      className="urja-green-submit-btn"
+                      style={{ width: 'auto', padding: '0.6rem 1.4rem' }}
+                      disabled={isForgotLoading}
+                    >
+                      {isForgotLoading ? 'Updating...' : 'Set New Password'}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* STEP 3: Reset Success Confirmation */}
+              {forgotStep === 'success' && (
+                <div className="urja-modal-success-state" style={{ textAlign: 'center', padding: '1rem 0' }}>
+                  <div className="success-icon-badge" style={{ margin: '0 auto 1rem', width: '48px', height: '48px', borderRadius: '50%', background: '#dcfce7', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                    ✓
+                  </div>
+                  <h5 style={{ fontSize: '1.15rem', color: '#0f172a', marginBottom: '0.5rem', fontWeight: 700 }}>
+                    Password Successfully Updated!
+                  </h5>
+                  <p style={{ color: '#475569', fontSize: '0.88rem', lineHeight: 1.5, marginBottom: '1.5rem' }}>
+                    Your password has been changed. You can now log into ATS Urja using your new credentials.
+                  </p>
+                  <button
+                    type="button"
+                    className="urja-green-submit-btn"
+                    style={{ width: '100%', padding: '0.75rem' }}
+                    onClick={handleCloseForgot}
+                  >
+                    Return to Sign In
+                  </button>
                 </div>
               )}
             </div>

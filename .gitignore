@@ -47,3 +47,7 @@ Thumbs.db
 .env.*.local
 
 **/.vite/
+
+# Uploads
+hr-management-portal/backend/uploads/**
+!hr-management-portal/backend/uploads/**/.gitkeep

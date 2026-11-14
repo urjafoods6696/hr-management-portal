@@ -17,484 +17,24 @@ const formatDate = (dateStr) => {
   }
 };
 
-// Fallback Employees matching Urja Foods reference UI and test scenarios
-const INITIAL_FALLBACK_EMPLOYEES = [
-  {
-    id: 10,
-    employeeCode: 'UF0012',
-    name: 'Amit Patil',
-    email: 'amit.patil@urjafoods.com',
-    phoneNumber: '+91 98765 43210',
-    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-    designationName: 'Software Engineer',
-    departmentName: 'IT',
-    workLocation: 'Pune',
-    joiningDate: '2024-11-01',
-    employmentType: 'Full Time',
-    reportingManagerName: 'Priyanka Deshmukh',
-    probationDurationMonths: 6,
-    probationEndDate: '2025-04-30',
-    confirmationStatus: 'CONFIRMED',
-    confirmationDate: '2025-05-01',
-    status: 'ACTIVE',
-    dateOfBirth: '1998-07-15',
-    gender: 'Male',
-    bloodGroup: 'O+',
-    maritalStatus: 'Single',
-    address: 'Pune, Maharashtra',
-    candidateId: 101,
-    offerId: 1,
-    canViewSensitiveInfo: true,
-    canTransitionStatus: true,
-    canEdit: true,
-    statusHistory: [
-      { id: 1, previousStatus: 'ON_PROBATION', newStatus: 'ACTIVE', changeReason: 'Probation completed with exceptional ratings', changedByName: 'Priyanka Deshmukh', createdAt: '2025-05-01T10:00:00' }
-    ],
-    documents: [
-      { id: 1, fileName: 'Signed Appointment Letter.pdf', documentType: 'APPOINTMENT_LETTER', fileSize: '2.4 MB', uploadedAt: '2024-11-01' },
-      { id: 2, fileName: 'Identity & Address Proof.pdf', documentType: 'ID_PROOF', fileSize: '1.8 MB', uploadedAt: '2024-11-01' },
-      { id: 3, fileName: 'Educational Degrees & Certifications.pdf', documentType: 'DEGREE_CERTIFICATE', fileSize: '4.2 MB', uploadedAt: '2024-11-01' },
-      { id: 4, fileName: 'Offer Letter - UF0012.pdf', documentType: 'OFFER_LETTER', fileSize: '1.2 MB', uploadedAt: '2024-10-25' }
-    ]
-  },
-  {
-    id: 11,
-    employeeCode: 'UF0013',
-    name: 'Neha Joshi',
-    email: 'neha.joshi@urjafoods.com',
-    phoneNumber: '+91 98765 43211',
-    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150',
-    designationName: 'HR Executive',
-    departmentName: 'Human Resources',
-    workLocation: 'Mumbai',
-    joiningDate: '2024-08-12',
-    employmentType: 'Full Time',
-    reportingManagerName: 'Priyanka Deshmukh',
-    probationDurationMonths: 6,
-    probationEndDate: '2025-02-12',
-    confirmationStatus: 'CONFIRMED',
-    confirmationDate: '2025-02-15',
-    status: 'ACTIVE',
-    dateOfBirth: '1996-03-22',
-    gender: 'Female',
-    bloodGroup: 'B+',
-    maritalStatus: 'Married',
-    address: 'Andheri West, Mumbai',
-    candidateId: 102,
-    offerId: 2,
-    canViewSensitiveInfo: true,
-    canTransitionStatus: true,
-    canEdit: true,
-    statusHistory: []
-  },
-  {
-    id: 12,
-    employeeCode: 'UF0014',
-    name: 'Rahul More',
-    email: 'rahul.more@urjafoods.com',
-    phoneNumber: '+91 98765 43212',
-    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-    designationName: 'Quality Analyst',
-    departmentName: 'Quality',
-    workLocation: 'Pune',
-    joiningDate: '2024-01-05',
-    employmentType: 'Full Time',
-    reportingManagerName: 'Priyanka Deshmukh',
-    probationDurationMonths: 6,
-    probationEndDate: '2024-07-05',
-    confirmationStatus: 'CONFIRMED',
-    confirmationDate: '2024-07-10',
-    status: 'ACTIVE',
-    dateOfBirth: '1995-11-09',
-    gender: 'Male',
-    bloodGroup: 'A+',
-    maritalStatus: 'Single',
-    address: 'Kothrud, Pune',
-    candidateId: 103,
-    offerId: 3,
-    canViewSensitiveInfo: true,
-    canTransitionStatus: true,
-    canEdit: true,
-    statusHistory: []
-  },
-  {
-    id: 13,
-    employeeCode: 'UF0015',
-    name: 'Sneha Shah',
-    email: 'sneha.shah@urjafoods.com',
-    phoneNumber: '+91 98765 43213',
-    avatarUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150',
-    designationName: 'Production Engineer',
-    departmentName: 'Production',
-    workLocation: 'Shirdi',
-    joiningDate: '2024-03-18',
-    employmentType: 'Full Time',
-    reportingManagerName: 'Priyanka Deshmukh',
-    probationDurationMonths: 6,
-    probationEndDate: '2024-09-18',
-    confirmationStatus: 'CONFIRMED',
-    confirmationDate: '2024-09-20',
-    status: 'ACTIVE',
-    dateOfBirth: '1997-01-14',
-    gender: 'Female',
-    bloodGroup: 'AB+',
-    maritalStatus: 'Single',
-    address: 'Shirdi, Ahmednagar',
-    candidateId: 104,
-    offerId: 4,
-    canViewSensitiveInfo: true,
-    canTransitionStatus: true,
-    canEdit: true,
-    statusHistory: []
-  },
-  {
-    id: 14,
-    employeeCode: 'UF0016',
-    name: 'Vikram Desai',
-    email: 'vikram.desai@urjafoods.com',
-    phoneNumber: '+91 98765 43214',
-    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150',
-    designationName: 'Plant Operator',
-    departmentName: 'Production',
-    workLocation: 'Rahuri',
-    joiningDate: '2026-06-10',
-    employmentType: 'Full Time',
-    reportingManagerName: 'Priyanka Deshmukh',
-    probationDurationMonths: 6,
-    probationEndDate: '2026-12-10',
-    confirmationStatus: 'PENDING_REVIEW',
-    confirmationDate: null,
-    status: 'ON_PROBATION',
-    dateOfBirth: '1999-09-05',
-    gender: 'Male',
-    bloodGroup: 'O-',
-    maritalStatus: 'Single',
-    address: 'Rahuri Plant Quarters',
-    candidateId: 105,
-    offerId: 5,
-    canViewSensitiveInfo: true,
-    canTransitionStatus: true,
-    canEdit: true,
-    statusHistory: [
-      { id: 2, previousStatus: 'APPLIED', newStatus: 'ON_PROBATION', changeReason: 'Onboarded as Plant Operator on 6-month probation', changedByName: 'Priyanka Deshmukh', createdAt: '2026-06-10T09:00:00' }
-    ]
-  },
-  {
-    id: 15,
-    employeeCode: 'UF0017',
-    name: 'Anita Kulkarni',
-    email: 'anita.kulkarni@urjafoods.com',
-    phoneNumber: '+91 98765 43215',
-    avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150',
-    designationName: 'Accounts Executive',
-    departmentName: 'Accounts',
-    workLocation: 'Pune',
-    joiningDate: '2024-07-22',
-    employmentType: 'Full Time',
-    reportingManagerName: 'Priyanka Deshmukh',
-    probationDurationMonths: 6,
-    probationEndDate: '2025-01-22',
-    confirmationStatus: 'CONFIRMED',
-    confirmationDate: '2025-01-25',
-    status: 'ACTIVE',
-    dateOfBirth: '1994-08-30',
-    gender: 'Female',
-    bloodGroup: 'A+',
-    maritalStatus: 'Married',
-    address: 'Shivajinagar, Pune',
-    candidateId: 106,
-    offerId: 6,
-    canViewSensitiveInfo: true,
-    canTransitionStatus: true,
-    canEdit: true,
-    statusHistory: []
-  },
-  {
-    id: 16,
-    employeeCode: 'UF0018',
-    name: 'Sandeep Jadhav',
-    email: 'sandeep.jadhav@urjafoods.com',
-    phoneNumber: '+91 98765 43216',
-    avatarUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150',
-    designationName: 'Maintenance Technician',
-    departmentName: 'Maintenance',
-    workLocation: 'Rahuri',
-    joiningDate: '2024-02-14',
-    employmentType: 'Full Time',
-    reportingManagerName: 'Priyanka Deshmukh',
-    probationDurationMonths: 6,
-    probationEndDate: '2024-08-14',
-    confirmationStatus: 'CONFIRMED',
-    confirmationDate: '2024-08-20',
-    status: 'ACTIVE',
-    dateOfBirth: '1993-04-12',
-    gender: 'Male',
-    bloodGroup: 'B+',
-    maritalStatus: 'Married',
-    address: 'Rahuri, Ahmednagar',
-    candidateId: 107,
-    offerId: 7,
-    canViewSensitiveInfo: true,
-    canTransitionStatus: true,
-    canEdit: true,
-    statusHistory: []
-  },
-  {
-    id: 17,
-    employeeCode: 'UF0019',
-    name: 'Pooja Khot',
-    email: 'pooja.khot@urjafoods.com',
-    phoneNumber: '+91 98765 43217',
-    avatarUrl: 'https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?w=150',
-    designationName: 'Sales Executive',
-    departmentName: 'Sales',
-    workLocation: 'Mumbai',
-    joiningDate: '2025-10-01',
-    employmentType: 'Full Time',
-    reportingManagerName: 'Priyanka Deshmukh',
-    probationDurationMonths: 6,
-    probationEndDate: '2026-04-01',
-    confirmationStatus: 'CONFIRMED',
-    confirmationDate: '2026-04-05',
-    status: 'ACTIVE',
-    dateOfBirth: '1997-06-19',
-    gender: 'Female',
-    bloodGroup: 'O+',
-    maritalStatus: 'Single',
-    address: 'Bandra, Mumbai',
-    candidateId: 108,
-    offerId: 8,
-    canViewSensitiveInfo: true,
-    canTransitionStatus: true,
-    canEdit: true,
-    statusHistory: []
-  },
-  {
-    id: 18,
-    employeeCode: 'UF0020',
-    name: 'Rohit Shinde',
-    email: 'rohit.shinde@urjafoods.com',
-    phoneNumber: '+91 98765 43218',
-    avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
-    designationName: 'Store Assistant',
-    departmentName: 'Warehouse',
-    workLocation: 'Pune',
-    joiningDate: '2023-09-17',
-    employmentType: 'Full Time',
-    reportingManagerName: 'Priyanka Deshmukh',
-    probationDurationMonths: 6,
-    probationEndDate: '2024-03-17',
-    confirmationStatus: 'CONFIRMED',
-    confirmationDate: '2024-03-20',
-    status: 'EXITED',
-    resignationDate: '2026-08-01',
-    noticePeriodDays: 30,
-    lastWorkingDay: '2026-08-31',
-    actualExitDate: '2026-08-31',
-    exitReason: 'Pursuing higher education abroad',
-    exitChecklistStatus: 'COMPLETED',
-    dateOfBirth: '1996-12-01',
-    gender: 'Male',
-    bloodGroup: 'A-',
-    maritalStatus: 'Single',
-    address: 'Hadapsar, Pune',
-    candidateId: 109,
-    offerId: 9,
-    canViewSensitiveInfo: true,
-    canTransitionStatus: true,
-    canEdit: true,
-    statusHistory: [
-      { id: 3, previousStatus: 'ACTIVE', newStatus: 'RESIGNATION_SUBMITTED', changeReason: 'Submitted resignation for higher studies', changedByName: 'Rohit Shinde', createdAt: '2026-08-01T11:00:00' },
-      { id: 4, previousStatus: 'RESIGNATION_SUBMITTED', newStatus: 'NOTICE_PERIOD', changeReason: 'Notice period initiated (30 days)', changedByName: 'Priyanka Deshmukh', createdAt: '2026-08-02T10:00:00' },
-      { id: 5, previousStatus: 'NOTICE_PERIOD', newStatus: 'EXITED', changeReason: 'Exit completed; all clearances obtained', changedByName: 'Priyanka Deshmukh', createdAt: '2026-08-31T17:30:00' }
-    ]
-  },
-  {
-    id: 19,
-    employeeCode: 'UF0021',
-    name: 'Akshay Mane',
-    email: 'akshay.mane@urjafoods.com',
-    phoneNumber: '+91 98765 43219',
-    avatarUrl: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150',
-    designationName: 'IT Support',
-    departmentName: 'IT',
-    workLocation: 'Pune',
-    joiningDate: '2026-10-03',
-    employmentType: 'Full Time',
-    reportingManagerName: 'Priyanka Deshmukh',
-    probationDurationMonths: 6,
-    probationEndDate: '2027-04-03',
-    confirmationStatus: 'CONFIRMED',
-    confirmationDate: '2026-10-25',
-    status: 'ACTIVE',
-    dateOfBirth: '2000-05-18',
-    gender: 'Male',
-    bloodGroup: 'B+',
-    maritalStatus: 'Single',
-    address: 'Viman Nagar, Pune',
-    candidateId: 110,
-    offerId: 10,
-    canViewSensitiveInfo: true,
-    canTransitionStatus: true,
-    canEdit: true,
-    statusHistory: []
-  },
-  {
-    id: 20,
-    employeeCode: 'UF0022',
-    name: 'Ganesh Jadhav',
-    email: 'ganesh.jadhav@urjafoods.com',
-    phoneNumber: '+91 98765 43220',
-    avatarUrl: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150',
-    designationName: 'Electrician',
-    departmentName: 'Maintenance',
-    workLocation: 'Rahuri',
-    joiningDate: '2026-04-20',
-    employmentType: 'Full Time',
-    reportingManagerName: 'Priyanka Deshmukh',
-    probationDurationMonths: 6,
-    probationEndDate: '2026-10-20',
-    confirmationStatus: 'PENDING_REVIEW',
-    confirmationDate: null,
-    isConfirmationDue: true,
-    status: 'ON_PROBATION',
-    dateOfBirth: '1995-02-10',
-    gender: 'Male',
-    bloodGroup: 'AB+',
-    maritalStatus: 'Married',
-    address: 'Rahuri Village, Ahmednagar',
-    candidateId: 111,
-    offerId: 11,
-    canViewSensitiveInfo: true,
-    canTransitionStatus: true,
-    canEdit: true,
-    statusHistory: []
-  },
-  {
-    id: 21,
-    employeeCode: 'UF0023',
-    name: 'Sunita Mane',
-    email: 'sunita.mane@urjafoods.com',
-    phoneNumber: '+91 98765 43221',
-    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-    designationName: 'Production Supervisor',
-    departmentName: 'Production',
-    workLocation: 'Shirdi',
-    joiningDate: '2025-05-15',
-    employmentType: 'Full Time',
-    reportingManagerName: 'Priyanka Deshmukh',
-    probationDurationMonths: 6,
-    probationEndDate: '2025-11-15',
-    confirmationStatus: 'CONFIRMED',
-    confirmationDate: '2025-11-20',
-    status: 'RESIGNATION_SUBMITTED',
-    resignationDate: '2026-10-22',
-    noticePeriodDays: 30,
-    lastWorkingDay: '2026-11-21',
-    actualExitDate: null,
-    exitReason: 'Relocation to native town',
-    exitChecklistStatus: 'IN_PROGRESS',
-    dateOfBirth: '1992-09-14',
-    gender: 'Female',
-    bloodGroup: 'O+',
-    maritalStatus: 'Married',
-    address: 'Shirdi Town, Ahmednagar',
-    candidateId: 122,
-    offerId: 20,
-    canViewSensitiveInfo: true,
-    canTransitionStatus: true,
-    canEdit: true,
-    statusHistory: [
-      { id: 6, previousStatus: 'ACTIVE', newStatus: 'RESIGNATION_SUBMITTED', changeReason: 'Relocation to native town', changedByName: 'Sunita Mane', createdAt: '2026-10-22T14:15:00' }
-    ]
-  },
-  {
-    id: 22,
-    employeeCode: 'UF0024',
-    name: 'Meena Kulkarni',
-    email: 'meena.kulkarni@urjafoods.com',
-    phoneNumber: '+91 98765 43222',
-    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150',
-    designationName: 'Chemist',
-    departmentName: 'Quality',
-    workLocation: 'Pune',
-    joiningDate: '2024-04-10',
-    employmentType: 'Full Time',
-    reportingManagerName: 'Priyanka Deshmukh',
-    probationDurationMonths: 6,
-    probationEndDate: '2024-10-10',
-    confirmationStatus: 'CONFIRMED',
-    confirmationDate: '2024-10-15',
-    status: 'NOTICE_PERIOD',
-    resignationDate: '2026-10-01',
-    noticePeriodDays: 30,
-    lastWorkingDay: '2026-10-31',
-    actualExitDate: null,
-    exitReason: 'Better opportunity in pharma sector',
-    exitChecklistStatus: 'IN_PROGRESS',
-    dateOfBirth: '1994-01-25',
-    gender: 'Female',
-    bloodGroup: 'A+',
-    maritalStatus: 'Single',
-    address: 'Kalyani Nagar, Pune',
-    candidateId: 114,
-    offerId: 12,
-    canViewSensitiveInfo: true,
-    canTransitionStatus: true,
-    canEdit: true,
-    statusHistory: [
-      { id: 7, previousStatus: 'ACTIVE', newStatus: 'RESIGNATION_SUBMITTED', changeReason: 'Career advancement in pharma', changedByName: 'Meena Kulkarni', createdAt: '2026-10-01T09:30:00' },
-      { id: 8, previousStatus: 'RESIGNATION_SUBMITTED', newStatus: 'NOTICE_PERIOD', changeReason: 'Serving notice period until 31 Oct', changedByName: 'Priyanka Deshmukh', createdAt: '2026-10-02T10:00:00' }
-    ]
-  },
-  {
-    id: 23,
-    employeeCode: 'UF0025',
-    name: 'Priya Kadam',
-    email: 'priya.kadam@urjafoods.com',
-    phoneNumber: '+91 98765 43223',
-    avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150',
-    designationName: 'Junior Accountant',
-    departmentName: 'Accounts',
-    workLocation: 'Pune',
-    joiningDate: '2026-10-25',
-    employmentType: 'Full Time',
-    reportingManagerName: 'Priyanka Deshmukh',
-    probationDurationMonths: null,
-    probationEndDate: null,
-    confirmationStatus: 'PENDING_REVIEW',
-    confirmationDate: null,
-    status: 'ON_PROBATION',
-    dateOfBirth: '1999-12-10',
-    gender: 'Female',
-    bloodGroup: 'B+',
-    maritalStatus: 'Single',
-    address: 'Swargate, Pune',
-    candidateId: 110,
-    offerId: 8,
-    canViewSensitiveInfo: true,
-    canTransitionStatus: true,
-    canEdit: true,
-    statusHistory: []
-  }
-];
+const INITIAL_FALLBACK_EMPLOYEES = [];
 
 export default function EmployeesManagementView({ currentUser, onToast }) {
   // State variables
-  const [employees, setEmployees] = useState(INITIAL_FALLBACK_EMPLOYEES);
+  const [employees, setEmployees] = useState([]);
   const [summaryStats, setSummaryStats] = useState({
-    totalEmployees: 186,
-    activeEmployees: 172,
-    onProbation: 8,
-    resignedExited: 6,
-    newJoinersThisMonth: 5,
-    confirmationDue: 1,
-    noticePeriod: 1,
-    totalEmployeesTrend: '↑ 4% vs last month',
-    activeEmployeesTrend: '↑ 3% vs last month',
+    totalEmployees: 0,
+    activeEmployees: 0,
+    onProbation: 0,
+    resignedExited: 0,
+    newJoinersThisMonth: 0,
+    confirmationDue: 0,
+    noticePeriod: 0,
+    totalEmployeesTrend: '0% vs last month',
+    activeEmployeesTrend: '0% vs last month',
     onProbationTrend: '0% vs last month',
-    resignedExitedTrend: '↑ 50% vs last month',
-    newJoinersTrend: '↑ 67% vs last month'
+    resignedExitedTrend: '0% vs last month',
+    newJoinersTrend: '0 new joiners'
   });
 
   const [loading, setLoading] = useState(false);
@@ -698,7 +238,7 @@ export default function EmployeesManagementView({ currentUser, onToast }) {
 
       if (!fetched) {
         // Robust client-side filtering on fallback data
-        let list = [...INITIAL_FALLBACK_EMPLOYEES];
+        let list = [];
         if (departmentFilter !== 'ALL') {
           list = list.filter(e => e.departmentName.toLowerCase() === departmentFilter.toLowerCase());
         }
@@ -975,10 +515,10 @@ export default function EmployeesManagementView({ currentUser, onToast }) {
             <div className="urja-emp-card-title">Total Employees</div>
             <div className="urja-emp-card-value-row">
               <span className="urja-emp-card-value" id="count-total-employees">
-                {summaryStats.totalEmployees || 186}
+                {summaryStats.totalEmployees ?? 0}
               </span>
               <span className="urja-emp-card-trend up">
-                {summaryStats.totalEmployeesTrend || '↑ 4% vs last month'}
+                {summaryStats.totalEmployeesTrend || '0% vs last month'}
               </span>
             </div>
           </div>
@@ -997,10 +537,10 @@ export default function EmployeesManagementView({ currentUser, onToast }) {
             <div className="urja-emp-card-title">Active Employees</div>
             <div className="urja-emp-card-value-row">
               <span className="urja-emp-card-value" id="count-active-employees">
-                {summaryStats.activeEmployees || 172}
+                {summaryStats.activeEmployees ?? 0}
               </span>
               <span className="urja-emp-card-trend up">
-                {summaryStats.activeEmployeesTrend || '↑ 3% vs last month'}
+                {summaryStats.activeEmployeesTrend || '0% vs last month'}
               </span>
             </div>
           </div>
@@ -1019,7 +559,7 @@ export default function EmployeesManagementView({ currentUser, onToast }) {
             <div className="urja-emp-card-title">On Probation</div>
             <div className="urja-emp-card-value-row">
               <span className="urja-emp-card-value" id="count-probation-employees">
-                {summaryStats.onProbation || 8}
+                {summaryStats.onProbation ?? 0}
               </span>
               <span className="urja-emp-card-trend neutral">
                 {summaryStats.onProbationTrend || '0% vs last month'}
@@ -1041,10 +581,10 @@ export default function EmployeesManagementView({ currentUser, onToast }) {
             <div className="urja-emp-card-title">Resigned / Exited</div>
             <div className="urja-emp-card-value-row">
               <span className="urja-emp-card-value" id="count-resigned-employees">
-                {summaryStats.resignedExited || 6}
+                {summaryStats.resignedExited ?? 0}
               </span>
               <span className="urja-emp-card-trend down">
-                {summaryStats.resignedExitedTrend || '↑ 50% vs last month'}
+                {summaryStats.resignedExitedTrend || '0% vs last month'}
               </span>
             </div>
           </div>
@@ -1063,10 +603,10 @@ export default function EmployeesManagementView({ currentUser, onToast }) {
             <div className="urja-emp-card-title">New Joiners (This Month)</div>
             <div className="urja-emp-card-value-row">
               <span className="urja-emp-card-value" id="count-new-joiners">
-                {summaryStats.newJoinersThisMonth || 5}
+                {summaryStats.newJoinersThisMonth ?? 0}
               </span>
               <span className="urja-emp-card-trend up">
-                {summaryStats.newJoinersTrend || '↑ 67% vs last month'}
+                {summaryStats.newJoinersTrend || '0 new joiners'}
               </span>
             </div>
           </div>

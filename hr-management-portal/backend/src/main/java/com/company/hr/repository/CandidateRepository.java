@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -19,6 +20,8 @@ public interface CandidateRepository extends JpaRepository<Candidate, Long> {
     List<Candidate> findByRequisitionId(Long requisitionId);
     Page<Candidate> findByStatus(Candidate.CandidateStatus status, Pageable pageable);
     long countByStatus(Candidate.CandidateStatus status);
+    long countByStatusIn(Collection<Candidate.CandidateStatus> statuses);
+    long countByCreatedAtGreaterThanEqual(java.time.LocalDateTime sinceDate);
 
     @Query("SELECT c.status, COUNT(c) FROM Candidate c GROUP BY c.status")
     List<Object[]> countCandidatesByPipelineStage();
@@ -29,24 +32,36 @@ public interface CandidateRepository extends JpaRepository<Candidate, Long> {
     @Query("SELECT COUNT(c) FROM Candidate c LEFT JOIN c.requisition r WHERE c.status = :status AND (:deptId IS NULL OR r.department.id = :deptId)")
     long countByStatusAndDept(@Param("status") Candidate.CandidateStatus status, @Param("deptId") Long deptId);
 
+    @Query("SELECT COUNT(c) FROM Candidate c LEFT JOIN c.requisition r WHERE c.status IN :statuses AND (:deptId IS NULL OR r.department.id = :deptId)")
+    long countByStatusInAndDept(@Param("statuses") Collection<Candidate.CandidateStatus> statuses, @Param("deptId") Long deptId);
+
+    @Query("SELECT COUNT(c) FROM Candidate c LEFT JOIN c.requisition r WHERE c.createdAt >= :sinceDate AND (:deptId IS NULL OR r.department.id = :deptId)")
+    long countNewSince(@Param("sinceDate") java.time.LocalDateTime sinceDate, @Param("deptId") Long deptId);
+
+    @Query("SELECT COUNT(c) FROM Candidate c LEFT JOIN c.requisition r WHERE c.createdAt >= :sinceDate AND r.assignedRecruiter.id = :recruiterId")
+    long countNewSinceForRecruiter(@Param("sinceDate") java.time.LocalDateTime sinceDate, @Param("recruiterId") Long recruiterId);
+
     long countByRequisitionAssignedRecruiterId(Long recruiterId);
 
     long countByRequisitionAssignedRecruiterIdAndStatus(Long recruiterId, Candidate.CandidateStatus status);
 
+    long countByRequisitionAssignedRecruiterIdAndStatusIn(Long recruiterId, Collection<Candidate.CandidateStatus> statuses);
+
     @Query("SELECT c FROM Candidate c " +
            "LEFT JOIN c.requisition r " +
            "LEFT JOIN r.department d " +
-           "WHERE (:search IS NULL OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(c.email) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(c.mobile) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(c.primarySkills) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(c.currentDesignation) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(r.jobTitle) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+           "WHERE (:search IS NULL OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(c.email) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(c.mobile) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(c.candidateCode) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(c.primarySkills) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(c.currentDesignation) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(r.jobTitle) LIKE LOWER(CONCAT('%', :search, '%'))) " +
            "AND (:reqId IS NULL OR r.id = :reqId) " +
-           "AND (:deptName IS NULL OR LOWER(d.departmentName) = LOWER(:deptName)) " +
-           "AND (:statusStr IS NULL OR str(c.status) = :statusStr) " +
+           "AND (:deptName IS NULL OR LOWER(COALESCE(NULLIF(TRIM(c.storedDepartment), ''), d.departmentName)) = LOWER(:deptName)) " +
+           "AND (:hasStatus = false OR str(c.status) IN :statuses) " +
            "AND (:sourceStr IS NULL OR str(c.source) = :sourceStr) " +
            "AND (:deptRestrictionId IS NULL OR d.id = :deptRestrictionId)")
     Page<Candidate> filterCandidates(
             @Param("search") String search,
             @Param("reqId") Long reqId,
             @Param("deptName") String deptName,
-            @Param("statusStr") String statusStr,
+            @Param("hasStatus") boolean hasStatus,
+            @Param("statuses") List<String> statuses,
             @Param("sourceStr") String sourceStr,
             @Param("deptRestrictionId") Long deptRestrictionId,
             Pageable pageable);
@@ -55,10 +70,10 @@ public interface CandidateRepository extends JpaRepository<Candidate, Long> {
            "LEFT JOIN c.requisition r " +
            "LEFT JOIN r.department d " +
            "LEFT JOIN Interview i ON i.candidate.id = c.id " +
-           "WHERE (:search IS NULL OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(c.email) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(c.mobile) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(c.primarySkills) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(c.currentDesignation) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(r.jobTitle) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+           "WHERE (:search IS NULL OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(c.email) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(c.mobile) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(c.candidateCode) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(c.primarySkills) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(c.currentDesignation) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(r.jobTitle) LIKE LOWER(CONCAT('%', :search, '%'))) " +
            "AND (:reqId IS NULL OR r.id = :reqId) " +
-           "AND (:deptName IS NULL OR LOWER(d.departmentName) = LOWER(:deptName)) " +
-           "AND (:statusStr IS NULL OR str(c.status) = :statusStr) " +
+           "AND (:deptName IS NULL OR LOWER(COALESCE(NULLIF(TRIM(c.storedDepartment), ''), d.departmentName)) = LOWER(:deptName)) " +
+           "AND (:hasStatus = false OR str(c.status) IN :statuses) " +
            "AND (:sourceStr IS NULL OR str(c.source) = :sourceStr) " +
            "AND (:deptRestrictionId IS NULL OR d.id = :deptRestrictionId) " +
            "AND (:recruiterId IS NULL OR r.assignedRecruiter.id = :recruiterId) " +
@@ -67,7 +82,8 @@ public interface CandidateRepository extends JpaRepository<Candidate, Long> {
             @Param("search") String search,
             @Param("reqId") Long reqId,
             @Param("deptName") String deptName,
-            @Param("statusStr") String statusStr,
+            @Param("hasStatus") boolean hasStatus,
+            @Param("statuses") List<String> statuses,
             @Param("sourceStr") String sourceStr,
             @Param("deptRestrictionId") Long deptRestrictionId,
             @Param("recruiterId") Long recruiterId,

@@ -44,7 +44,7 @@ public class ApprovalsInboxService {
     public ApprovalSummaryStatsDto getSummaryStats(UserPrincipal currentUser) {
         LocalDateTime startOfToday = LocalDate.now().atStartOfDay();
 
-        long pending = approvalRepository.countByStatus(Approval.ApprovalStatus.PENDING);
+        long pending = getPendingCount(currentUser);
         long approvedToday = approvalRepository.countByStatusAndDecisionDateAfter(Approval.ApprovalStatus.APPROVED,
                 startOfToday);
         long rejectedToday = approvalRepository.countByStatusAndDecisionDateAfter(Approval.ApprovalStatus.REJECTED,
@@ -72,6 +72,22 @@ public class ApprovalsInboxService {
                 .hiringApprovalsCount(hiringCount)
                 .otherApprovalsCount(otherCount)
                 .build();
+    }
+
+    /**
+     * Role-scoped pending approvals count for sidebar badge and header counters.
+     */
+    @Transactional(readOnly = true)
+    public long getPendingCount(UserPrincipal currentUser) {
+        if (currentUser == null) {
+            return 0L;
+        }
+        if (hasSuperAdminRights(currentUser)) {
+            return approvalRepository.countByStatus(Approval.ApprovalStatus.PENDING);
+        }
+        // Count pending items that this specific user has authority to review/decide
+        Page<ApprovalResponseDto> userPending = filterApprovals("ALL", null, "PENDING", null, null, null, currentUser, Pageable.unpaged());
+        return userPending.getTotalElements();
     }
 
     /**

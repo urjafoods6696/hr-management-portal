@@ -97,6 +97,7 @@ public class UserService {
                     .username(u.getUsername())
                     .name(u.getName())
                     .email(u.getEmail())
+                    .password(null)
                     .role(primaryRole)
                     .roles(roleNames)
                     .departmentId(u.getDepartmentRestrictionId())
@@ -141,6 +142,7 @@ public class UserService {
                 .username(request.getUsername().trim().toLowerCase())
                 .name(request.getName().trim())
                 .email(request.getEmail().trim().toLowerCase())
+                .password(request.getPassword())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .departmentRestrictionId(request.getDepartmentId())
                 .phoneNumber(request.getPhoneNumber())
@@ -165,9 +167,37 @@ public class UserService {
         return saved;
     }
 
+    public boolean isPrivilegedAdmin(User user) {
+        if (user == null) return false;
+        if ("itadmin".equalsIgnoreCase(user.getUsername()) || "hradmin".equalsIgnoreCase(user.getUsername()) || Long.valueOf(1L).equals(user.getId()) || Long.valueOf(2L).equals(user.getId())) {
+            return true;
+        }
+        if (user.getRoles() != null) {
+            for (Role r : user.getRoles()) {
+                if ("ROLE_IT_ADMIN".equals(r.getRoleName()) || "ROLE_HR_ADMIN".equals(r.getRoleName())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     @Transactional
     public User updateUser(Long id, UserUpdateRequest request, UserPrincipal currentUser) {
         User user = getUserById(id);
+
+        if (isPrivilegedAdmin(user)) {
+            if (request.getPassword() != null && !request.getPassword().isBlank()) {
+                throw new BadRequestException("Privileged administrator passwords (HR Admin / IT Admin) cannot be modified via User Management. Please use the secure Email OTP password change flow.");
+            }
+            if (currentUser != null) {
+                boolean isCurItAdmin = currentUser.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_IT_ADMIN"));
+                boolean isCurHrAdmin = currentUser.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_HR_ADMIN"));
+                if (!isCurItAdmin && !isCurHrAdmin) {
+                    throw new BadRequestException("Unauthorized: You do not have permission to modify a privileged administrator account.");
+                }
+            }
+        }
 
         if (!user.getEmail().equalsIgnoreCase(request.getEmail()) && userRepository.existsByEmail(request.getEmail())) {
             throw new BadRequestException("Email already taken: " + request.getEmail());
@@ -175,6 +205,10 @@ public class UserService {
 
         user.setName(request.getName().trim());
         user.setEmail(request.getEmail().trim().toLowerCase());
+        if (request.getPassword() != null && !request.getPassword().isBlank()) {
+            user.setPassword(request.getPassword().trim());
+            user.setPasswordHash(passwordEncoder.encode(request.getPassword().trim()));
+        }
         if (request.getPhoneNumber() != null) user.setPhoneNumber(request.getPhoneNumber());
         if (request.getDepartmentId() != null) user.setDepartmentRestrictionId(request.getDepartmentId());
         if (request.getStatus() != null) user.setStatus(request.getStatus());
@@ -237,8 +271,8 @@ public class UserService {
     @Transactional
     public User deactivateUser(Long id, UserPrincipal currentUser) {
         User user = getUserById(id);
-        if ("itadmin".equalsIgnoreCase(user.getUsername()) || id.equals(1L)) {
-            throw new BadRequestException("Protected root administrator account 'itadmin' cannot be deactivated.");
+        if (isPrivilegedAdmin(user)) {
+            throw new BadRequestException("Protected privileged administrator account ('" + user.getUsername() + "') cannot be deactivated.");
         }
         if (currentUser != null && currentUser.getId().equals(id)) {
             throw new BadRequestException("You cannot deactivate your own logged-in administrator account.");
@@ -275,8 +309,8 @@ public class UserService {
     @Transactional
     public void deleteUser(Long id, UserPrincipal currentUser) {
         User user = getUserById(id);
-        if ("itadmin".equalsIgnoreCase(user.getUsername()) || id.equals(1L)) {
-            throw new BadRequestException("Protected root administrator account 'itadmin' cannot be deleted.");
+        if (isPrivilegedAdmin(user)) {
+            throw new BadRequestException("Protected privileged administrator account ('" + user.getUsername() + "') cannot be deleted.");
         }
         if (currentUser != null && currentUser.getId().equals(id)) {
             throw new BadRequestException("You cannot delete your own logged-in administrator account.");
@@ -329,7 +363,7 @@ public class UserService {
             Optional<User> opt = userRepository.findById(id);
             if (opt.isEmpty()) continue;
             User u = opt.get();
-            if ("itadmin".equalsIgnoreCase(u.getUsername()) || u.getId().equals(1L)) continue;
+            if (isPrivilegedAdmin(u)) continue;
 
             if (u.getStatus() == User.UserStatus.ACTIVE) {
                 // Stage 1 for active user in bulk
@@ -527,5 +561,46 @@ public class UserService {
                 .lastLoginAt(user.getLastLoginAt())
                 .createdAt(user.getCreatedAt())
                 .build();
+    }
+
+    @Transactional
+    public UserResponseDto updateCurrentUserProfile(UserPrincipal currentUser, com.company.hr.dto.UserProfileUpdateRequest request) {
+        if (currentUser == null || currentUser.getId() == null) {
+            throw new BadRequestException("Unauthenticated user session.");
+        }
+
+        User user = userRepository.findById(currentUser.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + currentUser.getId()));
+
+        if (request.getName() != null && !request.getName().trim().isEmpty()) {
+            user.setName(request.getName().trim());
+        }
+
+        if (request.getPhoneNumber() != null) {
+            user.setPhoneNumber(request.getPhoneNumber().trim());
+        }
+
+        if (request.getProfileImageUrl() != null) {
+            user.setProfileImageUrl(request.getProfileImageUrl().trim().isEmpty() ? null : request.getProfileImageUrl().trim());
+        }
+
+        userRepository.save(user);
+
+        // Record audit trail
+        try {
+            auditLogRepository.save(AuditLog.builder()
+                    .actorId(currentUser.getId())
+                    .actorName(user.getName())
+                    .action("USER_PROFILE_UPDATED")
+                    .entityType("USER")
+                    .entityId(String.valueOf(user.getId()))
+                    .newValue("{\"name\":\"" + user.getName() + "\",\"phone\":\"" + user.getPhoneNumber() + "\"}")
+                    .ipAddress("127.0.0.1")
+                    .build());
+        } catch (Exception e) {
+            log.warn("Could not save audit log for profile update: {}", e.getMessage());
+        }
+
+        return getCurrentUserProfile(currentUser);
     }
 }

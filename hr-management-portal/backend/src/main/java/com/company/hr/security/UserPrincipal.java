@@ -61,12 +61,17 @@ public class UserPrincipal implements UserDetails {
                     : "/assets/images/woman.jpg";
         }
 
+        String pwd = user.getPasswordHash();
+        if (pwd == null || pwd.isBlank()) {
+            pwd = user.getPassword();
+        }
+
         return UserPrincipal.builder()
                 .id(user.getId())
                 .username(user.getUsername())
                 .name(user.getName())
                 .email(user.getEmail())
-                .password(user.getPasswordHash())
+                .password(pwd)
                 .departmentRestrictionId(user.getDepartmentRestrictionId())
                 .profileImageUrl(avatar)
                 .title(resolvedTitle)

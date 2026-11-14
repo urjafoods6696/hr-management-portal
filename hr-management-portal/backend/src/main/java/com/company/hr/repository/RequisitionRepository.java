@@ -18,6 +18,8 @@ public interface RequisitionRepository extends JpaRepository<Requisition, Long> 
 
     Page<Requisition> findByDepartmentId(Long departmentId, Pageable pageable);
 
+    long countByDepartmentId(Long departmentId);
+
     Page<Requisition> findByStatus(Requisition.RequisitionStatus status, Pageable pageable);
 
     Page<Requisition> findByAssignedRecruiterId(Long recruiterId, Pageable pageable);

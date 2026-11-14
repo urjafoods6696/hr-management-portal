@@ -282,14 +282,8 @@ export default function RequisitionDetailView({ requisition, onClose, onAssignRe
       {activeTab === 'candidates' && (
         <div className="card-portal p-4">
           <h5 className="fw-bold text-dark mb-3">Matched Candidates for {req.code}</h5>
-          <div className="table-responsive">
-            <table className="table table-hover align-middle mb-0">
-              <thead className="table-light"><tr><th>Candidate Name</th><th>Experience</th><th>Current Employer</th><th>Stage</th></tr></thead>
-              <tbody>
-                <tr><td><strong>Amit Shah</strong></td><td>4 years</td><td>Agro Processors Ltd</td><td><span className="badge bg-primary">Technical</span></td></tr>
-                <tr><td><strong>Tanmay Kadam</strong></td><td>4.5 years</td><td>Godrej Agrovet</td><td><span className="badge bg-info text-dark">Screening</span></td></tr>
-              </tbody>
-            </table>
+          <div className="text-muted py-3">
+            No candidates assigned to this requisition yet.
           </div>
         </div>
       )}

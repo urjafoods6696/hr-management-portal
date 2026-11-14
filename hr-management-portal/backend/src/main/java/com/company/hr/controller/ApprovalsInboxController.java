@@ -33,6 +33,15 @@ public class ApprovalsInboxController {
         return ResponseEntity.ok(ApiResponse.ok(stats));
     }
 
+    @GetMapping("/pending-count")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Get database-backed pending approvals count for sidebar badge")
+    public ResponseEntity<ApiResponse<java.util.Map<String, Long>>> getPendingCount(
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        long count = approvalsService.getPendingCount(currentUser);
+        return ResponseEntity.ok(ApiResponse.ok(java.util.Map.of("pendingCount", count)));
+    }
+
     @GetMapping
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Get filtered and paginated approvals list with search and role-based security")

@@ -38,13 +38,13 @@ export default function OffersOnboardingView({
 
   // 1. Core State
   const [summaryStats, setSummaryStats] = useState({
-    totalOffers: 24,
-    offersSent: 8,
-    accepted: 6,
-    declined: 2,
-    joiningScheduled: 5,
-    onboardingInProgress: 4,
-    onboarded: 3
+    totalOffers: 0,
+    offersSent: 0,
+    accepted: 0,
+    declined: 0,
+    joiningScheduled: 0,
+    onboardingInProgress: 0,
+    onboarded: 0
   });
 
   const [activeTab, setActiveTab] = useState('ALL');

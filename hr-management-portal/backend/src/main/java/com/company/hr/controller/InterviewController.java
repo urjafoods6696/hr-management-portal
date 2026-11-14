@@ -33,8 +33,8 @@ public class InterviewController {
     private final InterviewService interviewService;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('HR_ADMIN', 'IT_ADMIN', 'DEPT_HEAD', 'HR_RECRUITER')")
-    @Operation(summary = "Schedule an interview round and assign interviewer")
+    @PreAuthorize("hasRole('HR_ADMIN')")
+    @Operation(summary = "Schedule an interview round and assign interviewer (HR Admin only)")
     public ResponseEntity<ApiResponse<Interview>> scheduleInterview(
             @Valid @RequestBody InterviewScheduleRequest request,
             @AuthenticationPrincipal UserPrincipal currentUser) {
@@ -43,8 +43,8 @@ public class InterviewController {
     }
 
     @PostMapping("/schedule")
-    @PreAuthorize("hasAnyRole('HR_ADMIN', 'IT_ADMIN', 'DEPT_HEAD', 'HR_RECRUITER')")
-    @Operation(summary = "Schedule an interview round and assign interviewer (alias)")
+    @PreAuthorize("hasRole('HR_ADMIN')")
+    @Operation(summary = "Schedule an interview round and assign interviewer (alias, HR Admin only)")
     public ResponseEntity<ApiResponse<Interview>> scheduleInterviewAlias(
             @Valid @RequestBody InterviewScheduleRequest request,
             @AuthenticationPrincipal UserPrincipal currentUser) {
@@ -92,8 +92,8 @@ public class InterviewController {
     }
 
     @PutMapping("/{id}/reschedule")
-    @PreAuthorize("hasAnyRole('HR_ADMIN', 'IT_ADMIN', 'DEPT_HEAD', 'HR_RECRUITER')")
-    @Operation(summary = "Reschedule an interview round to a new date and time")
+    @PreAuthorize("hasRole('HR_ADMIN')")
+    @Operation(summary = "Reschedule an interview round to a new date and time (HR Admin only)")
     public ResponseEntity<ApiResponse<Interview>> rescheduleInterview(
             @PathVariable Long id,
             @Valid @RequestBody InterviewRescheduleRequest request,
@@ -103,8 +103,8 @@ public class InterviewController {
     }
 
     @PutMapping("/{id}/reassign")
-    @PreAuthorize("hasAnyRole('HR_ADMIN', 'IT_ADMIN', 'DEPT_HEAD', 'HR_RECRUITER')")
-    @Operation(summary = "Reassign an interview to another eligible interviewer")
+    @PreAuthorize("hasRole('HR_ADMIN')")
+    @Operation(summary = "Reassign an interview to another active user (HR Admin only)")
     public ResponseEntity<ApiResponse<Interview>> reassignInterview(
             @PathVariable Long id,
             @Valid @RequestBody InterviewReassignRequest request,
@@ -114,8 +114,8 @@ public class InterviewController {
     }
 
     @PutMapping("/{id}/cancel")
-    @PreAuthorize("hasAnyRole('HR_ADMIN', 'IT_ADMIN')")
-    @Operation(summary = "Cancel an interview round")
+    @PreAuthorize("hasRole('HR_ADMIN')")
+    @Operation(summary = "Cancel an interview round (HR Admin only)")
     public ResponseEntity<ApiResponse<Interview>> cancelInterview(
             @PathVariable Long id,
             @RequestParam(required = false) String reason,
@@ -125,8 +125,8 @@ public class InterviewController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('HR_ADMIN', 'IT_ADMIN')")
-    @Operation(summary = "Cancel an interview round (DELETE alias)")
+    @PreAuthorize("hasRole('HR_ADMIN')")
+    @Operation(summary = "Cancel an interview round (DELETE alias, HR Admin only)")
     public ResponseEntity<ApiResponse<Interview>> cancelInterviewDelete(
             @PathVariable Long id,
             @RequestParam(required = false) String reason,

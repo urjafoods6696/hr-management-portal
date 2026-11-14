@@ -30,21 +30,17 @@ public class NotificationService {
     private final UserRepository userRepository;
     private final JavaMailSender mailSender;
 
+    @org.springframework.beans.factory.annotation.Value("${spring.mail.username:recruitment-alerts@company.com}")
+    private String fromEmail;
+
+    @org.springframework.beans.factory.annotation.Value("${spring.mail.password:secret}")
+    private String mailPassword;
+
     @Transactional(readOnly = true)
     public List<NotificationDto> getUserNotifications(UserPrincipal currentUser) {
         if (currentUser == null) return List.of();
 
         List<Notification> notifications = notificationRepository.findByUserIdOrderByCreatedAtDesc(currentUser.getId());
-        
-        // If user has no notifications in the database yet, seed the default 5 unread notifications
-        if (notifications.isEmpty()) {
-            User user = userRepository.findById(currentUser.getId()).orElse(null);
-            if (user != null) {
-                seedInitialNotificationsForUser(user);
-                notifications = notificationRepository.findByUserIdOrderByCreatedAtDesc(currentUser.getId());
-            }
-        }
-
         return notifications.stream()
                 .map(NotificationDto::fromEntity)
                 .collect(Collectors.toList());
@@ -57,7 +53,7 @@ public class NotificationService {
         }
 
         long unread = notificationRepository.countByUserIdAndReadStatus(currentUser.getId(), Notification.ReadStatus.UNREAD);
-        long total = notificationRepository.count(); // or user's total notifications
+        long total = notificationRepository.countByUserId(currentUser.getId());
         return NotificationCountDto.builder()
                 .unreadCount(unread)
                 .totalCount(total)
@@ -133,8 +129,16 @@ public class NotificationService {
 
     @Async
     public void sendEmailNotification(String toEmail, String subject, String body) {
+        boolean isPlaceholderSmtp = "secret".equalsIgnoreCase(mailPassword)
+                || "recruitment-alerts@company.com".equalsIgnoreCase(fromEmail);
+        if (isPlaceholderSmtp) {
+            log.debug("Skipping email dispatch to {} - placeholder SMTP credentials active.", toEmail);
+            return;
+        }
+
         try {
             SimpleMailMessage mail = new SimpleMailMessage();
+            mail.setFrom(fromEmail);
             mail.setTo(toEmail);
             mail.setSubject("[HR Portal] " + subject);
             mail.setText(body);

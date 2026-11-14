@@ -185,24 +185,19 @@ export default function SystemAdministrationView({ currentUser, showToast }) {
         } else if (body && body.data && Array.isArray(body.data)) {
           list = body.data;
         }
-        if (!list || list.length === 0) {
-          list = REALISTIC_AUDIT_LOGS;
+        if (!list) {
+          list = [];
         }
         const normalized = list.map(log => {
-          let ip = log.ipAddress || '192.168.1.50';
-          if (ip === '127.0.0.1' || ip === '0:0:0:0:0:0:0:1') {
-            if ((log.actorName || '').includes('Arjun')) ip = '192.168.1.27';
-            else if ((log.action || '').includes('APPROVED')) ip = '192.168.0.19';
-            else ip = '192.168.1.50';
-          }
+          let ip = log.ipAddress || '127.0.0.1';
           return { ...log, ipAddress: ip };
         });
         setAuditLogs(normalized);
       })
       .catch(err => {
         setIsLoadingAudit(false);
-        console.warn('Using fallback audit logs:', err);
-        setAuditLogs(REALISTIC_AUDIT_LOGS);
+        console.warn('Audit logs API failed:', err);
+        setAuditLogs([]);
       });
   };
 
@@ -223,13 +218,13 @@ export default function SystemAdministrationView({ currentUser, showToast }) {
         if (body && body.data && Array.isArray(body.data)) {
           setBackups(body.data);
         } else {
-          setBackups(INITIAL_BACKUPS);
+          setBackups([]);
         }
       })
       .catch(err => {
         setIsLoadingBackups(false);
-        console.warn('Using fallback backups:', err);
-        setBackups(INITIAL_BACKUPS);
+        console.warn('Backups API failed:', err);
+        setBackups([]);
       });
   };
 
@@ -630,7 +625,7 @@ export default function SystemAdministrationView({ currentUser, showToast }) {
         >
           <i className="bi bi-journal-text"></i>
           <span>Audit Logs</span>
-          <span className="urja-tab-counter-badge">{auditLogs.length || 9}</span>
+          <span className="urja-tab-counter-badge">{auditLogs.length}</span>
         </button>
 
         <button
@@ -643,7 +638,7 @@ export default function SystemAdministrationView({ currentUser, showToast }) {
         >
           <i className="bi bi-cloud"></i>
           <span>Backup & Restore</span>
-          <span className="urja-tab-counter-badge">7</span>
+          <span className="urja-tab-counter-badge">{backups.length}</span>
         </button>
 
         <button
@@ -683,7 +678,7 @@ export default function SystemAdministrationView({ currentUser, showToast }) {
                 <i className="bi bi-shield-check"></i>
               </div>
               <div>
-                <div className="urja-audit-kpi-value">{auditLogs.length || 9}</div>
+                <div className="urja-audit-kpi-value">{auditLogs.length}</div>
                 <div className="urja-audit-kpi-label">Total Security Events</div>
               </div>
             </div>
@@ -693,7 +688,7 @@ export default function SystemAdministrationView({ currentUser, showToast }) {
                 <i className="bi bi-people"></i>
               </div>
               <div>
-                <div className="urja-audit-kpi-value">18</div>
+                <div className="urja-audit-kpi-value">{auditLogs.filter(a => a.category === 'SECURITY' || a.category === 'AUTH' || (a.action && (a.action.includes('LOGIN') || a.action.includes('AUTH')))).length}</div>
                 <div className="urja-audit-kpi-label">Authentication Events</div>
               </div>
             </div>
@@ -703,7 +698,7 @@ export default function SystemAdministrationView({ currentUser, showToast }) {
                 <i className="bi bi-toggles"></i>
               </div>
               <div>
-                <div className="urja-audit-kpi-value">6</div>
+                <div className="urja-audit-kpi-value">{auditLogs.filter(a => a.category === 'POLICY' || (a.action && a.action.includes('POLICY'))).length}</div>
                 <div className="urja-audit-kpi-label">Policy Modifications</div>
               </div>
             </div>
@@ -713,7 +708,7 @@ export default function SystemAdministrationView({ currentUser, showToast }) {
                 <i className="bi bi-diagram-3"></i>
               </div>
               <div>
-                <div className="urja-audit-kpi-value">14</div>
+                <div className="urja-audit-kpi-value">{auditLogs.filter(a => a.category === 'WORKFLOW' || a.category === 'USER_MGMT' || a.category === 'DATA_RESET' || (a.action && !a.action.includes('LOGIN') && !a.action.includes('POLICY'))).length}</div>
                 <div className="urja-audit-kpi-label">Workflow Actions</div>
               </div>
             </div>

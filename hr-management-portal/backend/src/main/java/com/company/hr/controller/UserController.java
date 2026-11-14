@@ -1,12 +1,14 @@
 package com.company.hr.controller;
 
 import com.company.hr.dto.ApiResponse;
+import com.company.hr.dto.UserProfileUpdateRequest;
 import com.company.hr.dto.UserResponseDto;
 import com.company.hr.entity.User;
 import com.company.hr.security.UserPrincipal;
 import com.company.hr.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -14,7 +16,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/users")
+@RequestMapping({"/api/users", "/api/v1/users"})
 @RequiredArgsConstructor
 @Tag(name = "User Management", description = "User profile and lifecycle endpoints")
 public class UserController {
@@ -28,6 +30,16 @@ public class UserController {
             @AuthenticationPrincipal UserPrincipal currentUser) {
         UserResponseDto profile = userService.getCurrentUserProfile(currentUser);
         return ResponseEntity.ok(ApiResponse.ok(profile));
+    }
+
+    @PutMapping("/me")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Update authenticated user's own profile (Full Name, Phone Number, Avatar)")
+    public ResponseEntity<ApiResponse<UserResponseDto>> updateCurrentUserProfile(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @Valid @RequestBody UserProfileUpdateRequest request) {
+        UserResponseDto profile = userService.updateCurrentUserProfile(currentUser, request);
+        return ResponseEntity.ok(ApiResponse.ok(profile, "Profile updated successfully."));
     }
 
     @PatchMapping("/{id}/deactivate")

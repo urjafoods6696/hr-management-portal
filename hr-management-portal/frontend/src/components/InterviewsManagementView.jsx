@@ -1,6 +1,62 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { INITIAL_LOCATIONS } from '../data/mockData';
 import '../styles/urja-interviews.css';
+import EvaluationCriteriaAutocomplete from './EvaluationCriteriaAutocomplete';
+
+// Helper to extract criteria list from interview entity/instructions
+const getInterviewCriteriaList = (inv) => {
+  if (!inv) return [];
+  if (Array.isArray(inv.evaluationCriteria)) return inv.evaluationCriteria;
+  if (typeof inv.evaluationCriteria === 'string' && inv.evaluationCriteria.trim()) {
+    return inv.evaluationCriteria.split(',').map(s => s.trim()).filter(Boolean);
+  }
+  if (typeof inv.instructions === 'string' && inv.instructions.includes('Criteria:')) {
+    const parts = inv.instructions.split('Criteria:');
+    if (parts.length > 1) {
+      return parts[1].split(',').map(s => s.trim()).filter(Boolean);
+    }
+  }
+  return [];
+};
+
+// Helper to format system role display name cleanly
+const formatRoleName = (r) => {
+  if (!r) return 'User';
+  const str = String(r).trim();
+  switch (str) {
+    case 'ROLE_HR_ADMIN': return 'HR Administrator';
+    case 'ROLE_IT_ADMIN': return 'Administrator';
+    case 'ROLE_HR_RECRUITER': return 'Recruiter';
+    case 'ROLE_INTERVIEWER': return 'Interviewer';
+    case 'ROLE_DEPT_HEAD': return 'Department Head';
+    case 'ROLE_APPROVING_MANAGER': return 'Approving Manager';
+    case 'ROLE_HRBP': return 'HR Business Partner';
+    case 'ROLE_SENIOR_MGMT': return 'Senior Management';
+    case 'ROLE_EMPLOYEE': return 'Employee';
+    default:
+      if (str.startsWith('ROLE_')) {
+        return str.replace('ROLE_', '').split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+      }
+      return str;
+  }
+};
+
+// Helper to format system interviewer dropdown option: Full Name – Username or Email – System Role
+const formatInterviewerLabel = (u) => {
+  if (!u) return '';
+  const name = u.name || 'Unnamed User';
+  const identifier = u.email || u.username || '';
+  let role = u.systemRole;
+  if (!role && u.roles && u.roles.length > 0) {
+    const rawRole = typeof u.roles[0] === 'string' ? u.roles[0] : (u.roles[0].roleName || u.roles[0].name || '');
+    role = formatRoleName(rawRole);
+  } else if (!role && u.role) {
+    role = formatRoleName(u.role);
+  } else if (!role) {
+    role = u.designation || 'User';
+  }
+  return identifier ? `${name} – ${identifier} – ${role}` : `${name} – ${role}`;
+};
 
 export default function InterviewsManagementView({
   currentUser,
@@ -72,7 +128,7 @@ export default function InterviewsManagementView({
     meetingLink: '',
     meetingLocation: '',
     instructions: 'Evaluate core technical problem solving, domain competency, and architecture knowledge.',
-    evaluationCriteria: ['Core Technical Skills', 'Problem Solving', 'Communication']
+    evaluationCriteria: []
   });
 
   const [scheduleFormErrors, setScheduleFormErrors] = useState({});
@@ -103,19 +159,17 @@ export default function InterviewsManagementView({
     comments: 'Strong candidate overall. Recommended to advance to managerial discussion.'
   });
 
-  // Role permissions
-  const userRole = (currentUser?.roles && currentUser.roles[0]?.roleName) || 
-                   (currentUser?.roles && currentUser.roles[0]) || 
-                   currentUser?.role || 'ROLE_HR_ADMIN';
+  // Role permissions: ONLY HR Admin can schedule, reschedule, reassign, or cancel interview rounds
+  const userRoles = (currentUser?.roles || []).map(r => typeof r === 'string' ? r : (r.roleName || r.name || ''));
+  if (currentUser?.role) userRoles.push(currentUser.role);
+  const isHRAdmin = userRoles.includes('ROLE_HR_ADMIN') || currentUser?.role === 'ROLE_HR_ADMIN';
+  const isInterviewer = userRoles.includes('ROLE_INTERVIEWER');
+  const isRecruiter = userRoles.includes('ROLE_HR_RECRUITER');
+  const isITAdmin = userRoles.includes('ROLE_IT_ADMIN');
+  const isDeptHead = userRoles.includes('ROLE_DEPT_HEAD');
 
-  const isHRAdmin = userRole === 'ROLE_HR_ADMIN';
-  const isInterviewer = userRole === 'ROLE_INTERVIEWER';
-  const isRecruiter = userRole === 'ROLE_HR_RECRUITER';
-  const isITAdmin = userRole === 'ROLE_IT_ADMIN';
-  const isDeptHead = userRole === 'ROLE_DEPT_HEAD';
-
-  const canSchedule = isHRAdmin || isRecruiter || isITAdmin || isDeptHead;
-  const canManage = isHRAdmin || isITAdmin;
+  const canSchedule = isHRAdmin;
+  const canManage = isHRAdmin;
 
   // Close actions dropdown on click outside
   useEffect(() => {
@@ -278,7 +332,7 @@ export default function InterviewsManagementView({
         verified: data.available === true,
         hasConflict: data.hasConflict === true,
         conflictReason: data.conflictReason || null,
-        message: data.message || (data.available ? 'Panel member availability and role credentials verified.' : 'Interviewer is unavailable.')
+        message: data.message || (data.available ? 'User availability and credentials verified.' : 'Interviewer is unavailable.')
       };
       if (isReassign) setReassignAvailability(stateUpdate);
       else setScheduleAvailability(stateUpdate);
@@ -653,6 +707,10 @@ export default function InterviewsManagementView({
   // Handle Schedule Submit (Requirements 1, 2, 3, 4, 5)
   const handleScheduleSubmit = async (e) => {
     e.preventDefault();
+    if (!isHRAdmin) {
+      showToast('Only users with the HR Admin role can schedule or assign interview tasks.');
+      return;
+    }
     const errors = {};
     if (!scheduleForm.candidateId) errors.candidateId = 'Candidate selection is required.';
     if (!scheduleForm.interviewerId) errors.interviewerId = 'Interviewer selection is required.';
@@ -686,6 +744,11 @@ export default function InterviewsManagementView({
     }
 
     const token = await getAuthToken();
+    const criteriaArray = Array.isArray(scheduleForm.evaluationCriteria) 
+      ? scheduleForm.evaluationCriteria 
+      : [];
+    const criteriaStr = criteriaArray.join(', ');
+
     const reqBody = {
       candidateId: parseInt(scheduleForm.candidateId),
       requisitionId: parseInt(scheduleForm.requisitionId || 1),
@@ -698,7 +761,10 @@ export default function InterviewsManagementView({
       mode: scheduleForm.mode,
       meetingLink: scheduleForm.mode === 'ONLINE' ? scheduleForm.meetingLink.trim() : null,
       meetingLocation: scheduleForm.mode === 'IN_PERSON' ? scheduleForm.meetingLocation.trim() : (scheduleForm.mode === 'ONLINE' ? 'Online Video Call' : 'Telephonic Screen'),
-      instructions: `${scheduleForm.instructions} | Criteria: ${scheduleForm.evaluationCriteria.join(', ')}`
+      instructions: criteriaStr 
+        ? (scheduleForm.instructions ? `${scheduleForm.instructions} | Criteria: ${criteriaStr}` : `Criteria: ${criteriaStr}`) 
+        : (scheduleForm.instructions || 'Evaluate candidate skills and submit scorecard.'),
+      evaluationCriteria: criteriaStr
     };
 
     fetch('http://localhost:8080/api/v1/interviews', {
@@ -765,6 +831,10 @@ export default function InterviewsManagementView({
   // Handle Reschedule Submit (Requirements 1, 2, 3, 4, 5)
   const handleRescheduleSubmit = async (e) => {
     e.preventDefault();
+    if (!isHRAdmin) {
+      showToast('Only users with the HR Admin role can reschedule interview rounds.');
+      return;
+    }
     if (!selectedInterview) return;
 
     const errors = {};
@@ -842,6 +912,10 @@ export default function InterviewsManagementView({
   // Handle Reassign Submit (Requirements 3, 4, 8)
   const handleReassignSubmit = async (e) => {
     e.preventDefault();
+    if (!isHRAdmin) {
+      showToast('Only users with the HR Admin role can reassign interview tasks.');
+      return;
+    }
     if (!selectedInterview || !reassignForm.newInterviewerId) return;
 
     if (reassignAvailability.hasConflict) {
@@ -877,6 +951,10 @@ export default function InterviewsManagementView({
 
   // Handle Cancel Interview
   const handleCancelInterview = async (inv) => {
+    if (!isHRAdmin) {
+      showToast('Only users with the HR Admin role can cancel interview tasks.');
+      return;
+    }
     const cand = getCandidateInfo(inv);
     if (!window.confirm(`Are you sure you want to cancel the interview round for ${cand.name}?`)) return;
 
@@ -1270,7 +1348,7 @@ export default function InterviewsManagementView({
                 <option value="ALL">All Interviewers</option>
                 {eligibleInterviewers.map(u => (
                   <option key={u.id} value={u.name}>
-                    {u.name} — {u.designation || u.title || 'Panel Member'}
+                    {formatInterviewerLabel(u)}
                   </option>
                 ))}
               </select>
@@ -1575,7 +1653,7 @@ export default function InterviewsManagementView({
                         <div className="actions-cell-wrap">
                           
                           {/* Quick Action Buttons */}
-                          {isInterviewer && isAssignedToCurrent && !isCompleted && !isCancelled && (
+                          {(isAssignedToCurrent || isHRAdmin) && !isCompleted && !isCancelled && (
                             <button 
                               type="button" 
                               className="urja-btn-modal-submit"
@@ -1634,7 +1712,7 @@ export default function InterviewsManagementView({
                                 </button>
                               )}
 
-                              {!isCompleted && !isCancelled && (isInterviewer || canManage) && (
+                              {!isCompleted && !isCancelled && (isAssignedToCurrent || isHRAdmin) && (
                                 <button 
                                   type="button" 
                                   className="urja-menu-item"
@@ -1765,7 +1843,7 @@ export default function InterviewsManagementView({
                 </div>
                 <div>
                   <h3 className="urja-modal-title">Schedule Interview Round</h3>
-                  <p className="urja-modal-subtitle">Assign candidates to active panel members and configure session logistics.</p>
+                  <p className="urja-modal-subtitle">Assign candidates to registered system users and configure session logistics.</p>
                 </div>
               </div>
               <button 
@@ -2007,7 +2085,7 @@ export default function InterviewsManagementView({
                     </label>
                     {eligibleInterviewers.length > 0 && (
                       <span className="text-muted" style={{ fontSize: '0.7rem' }}>
-                        {eligibleInterviewers.length} active leads authorized
+                        {eligibleInterviewers.length} active users available
                       </span>
                     )}
                   </div>
@@ -2039,10 +2117,10 @@ export default function InterviewsManagementView({
                       <option value="">No active interviewers available. Please contact HR Admin.</option>
                     ) : (
                       <>
-                        <option value="">-- Choose Active Panel Lead --</option>
+                        <option value="">-- Select Active System User --</option>
                         {eligibleInterviewers.map(u => (
                           <option key={u.id} value={u.id}>
-                            {u.name} — {u.designation || u.title || 'Panel Member'} ({u.email})
+                            {formatInterviewerLabel(u)}
                           </option>
                         ))}
                       </>
@@ -2055,7 +2133,7 @@ export default function InterviewsManagementView({
                       {scheduleAvailability.isChecking ? (
                         <small className="text-muted d-flex align-items-center" style={{ fontSize: '0.74rem' }}>
                           <span className="spinner-border spinner-border-sm me-1" role="status" style={{ width: '0.7rem', height: '0.7rem' }}></span>
-                          Verifying panel member availability & role credentials...
+                          Verifying user availability & credentials...
                         </small>
                       ) : scheduleAvailability.hasConflict ? (
                         <div id="sched-conflict-alert" className="alert alert-danger py-1 px-2 mt-1 mb-0 small" style={{ fontSize: '0.74rem' }}>
@@ -2064,7 +2142,7 @@ export default function InterviewsManagementView({
                         </div>
                       ) : scheduleAvailability.verified ? (
                         <small id="sched-verified-badge" className="text-success d-block" style={{ fontSize: '0.74rem' }}>
-                          <i className="bi bi-shield-check me-1"></i> Panel member availability and role credentials verified.
+                          <i className="bi bi-shield-check me-1"></i> User availability and credentials verified.
                         </small>
                       ) : scheduleAvailability.message ? (
                         <small className="text-danger d-block" style={{ fontSize: '0.74rem' }}>
@@ -2075,33 +2153,12 @@ export default function InterviewsManagementView({
                   )}
                 </div>
 
-                {/* 6. Evaluation Criteria Checklist */}
-                <div>
-                  <label className="form-label small fw-bold text-dark mb-1">Evaluation Focus Areas & Criteria</label>
-                  <div className="urja-criteria-pill-group">
-                    {[
-                      'Core Technical Skills',
-                      'Problem Solving',
-                      'Architecture & Coding',
-                      'Domain Knowledge',
-                      'Communication',
-                      'Cultural Fit',
-                      'Leadership Potential'
-                    ].map(crit => {
-                      const isSel = scheduleForm.evaluationCriteria.includes(crit);
-                      return (
-                        <span 
-                          key={crit}
-                          className={`urja-criteria-pill ${isSel ? 'selected' : ''}`}
-                          onClick={() => handleToggleCriteria(crit)}
-                        >
-                          <i className={`bi ${isSel ? 'bi-check-circle-fill' : 'bi-plus'} me-1`}></i>
-                          {crit}
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
+                {/* 6. Evaluation Focus Areas & Criteria (Smart Autocomplete) */}
+                <EvaluationCriteriaAutocomplete
+                  selectedCriteria={scheduleForm.evaluationCriteria}
+                  onChange={(newCriteria) => setScheduleForm(prev => ({ ...prev, evaluationCriteria: newCriteria }))}
+                  disabled={!isHRAdmin}
+                />
 
                 {/* 7. Instructions */}
                 <div>
@@ -2336,8 +2393,8 @@ export default function InterviewsManagementView({
                   <i className="bi bi-person-gear"></i>
                 </div>
                 <div>
-                  <h3 className="urja-modal-title">Reassign Panel Interviewer</h3>
-                  <p className="urja-modal-subtitle">Transfer round evaluation to another active staff member.</p>
+                  <h3 className="urja-modal-title">Reassign Interview Task</h3>
+                  <p className="urja-modal-subtitle">Transfer round evaluation to another active registered user.</p>
                 </div>
               </div>
               <button type="button" className="urja-modal-close-btn" onClick={() => setShowReassignModal(false)}>✕</button>
@@ -2357,12 +2414,12 @@ export default function InterviewsManagementView({
                 <div>
                   <div className="d-flex align-items-center justify-content-between mb-1">
                     <label htmlFor="reassign-interviewer" className="form-label small fw-bold text-dark mb-0">
-                      Select New Panel Member *
+                      Select New Active Interviewer *
                       {isLoadingInterviewers && <span className="spinner-border spinner-border-sm text-purple ms-2" role="status"></span>}
                     </label>
                     {eligibleInterviewers.length > 0 && (
                       <span className="text-muted" style={{ fontSize: '0.7rem' }}>
-                        {eligibleInterviewers.length} active leads authorized
+                        {eligibleInterviewers.length} active users available
                       </span>
                     )}
                   </div>
@@ -2394,10 +2451,10 @@ export default function InterviewsManagementView({
                       <option value="">No active interviewers available. Please contact HR Admin.</option>
                     ) : (
                       <>
-                        <option value="">-- Choose Eligible Interviewer --</option>
+                        <option value="">-- Select Active System User --</option>
                         {eligibleInterviewers.map(u => (
                           <option key={u.id} value={u.id}>
-                            {u.name} — {u.designation || u.title || 'Panel Member'} ({u.email})
+                            {formatInterviewerLabel(u)}
                           </option>
                         ))}
                       </>
@@ -2410,7 +2467,7 @@ export default function InterviewsManagementView({
                       {reassignAvailability.isChecking ? (
                         <small className="text-muted d-flex align-items-center" style={{ fontSize: '0.74rem' }}>
                           <span className="spinner-border spinner-border-sm me-1" role="status" style={{ width: '0.7rem', height: '0.7rem' }}></span>
-                          Verifying new panel member availability & role credentials...
+                          Verifying user availability & credentials...
                         </small>
                       ) : reassignAvailability.hasConflict ? (
                         <div id="reassign-conflict-alert" className="alert alert-danger py-1 px-2 mt-1 mb-0 small" style={{ fontSize: '0.74rem' }}>
@@ -2419,7 +2476,7 @@ export default function InterviewsManagementView({
                         </div>
                       ) : reassignAvailability.verified ? (
                         <small id="reassign-verified-badge" className="text-success d-block" style={{ fontSize: '0.74rem' }}>
-                          <i className="bi bi-shield-check me-1"></i> Panel member availability and role credentials verified.
+                          <i className="bi bi-shield-check me-1"></i> User availability and credentials verified.
                         </small>
                       ) : reassignAvailability.message ? (
                         <small className="text-danger d-block" style={{ fontSize: '0.74rem' }}>
@@ -2483,6 +2540,28 @@ export default function InterviewsManagementView({
             <form onSubmit={handleFeedbackSubmit}>
               <div className="urja-modal-body">
                 
+                {/* Configured Focus Areas & Criteria for Interviewer */}
+                {getInterviewCriteriaList(selectedInterview).length > 0 && (
+                  <div className="mb-3 p-2 rounded" style={{ background: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+                    <div className="d-flex align-items-center justify-content-between mb-1">
+                      <small className="fw-bold text-dark" style={{ fontSize: '0.74rem' }}>
+                        <i className="bi bi-bullseye text-success me-1"></i>
+                        Assigned Evaluation Focus Areas & Criteria:
+                      </small>
+                      <span className="badge bg-success-subtle text-success border border-success" style={{ fontSize: '0.66rem' }}>
+                        {getInterviewCriteriaList(selectedInterview).length} focus areas
+                      </span>
+                    </div>
+                    <div className="d-flex flex-wrap gap-1">
+                      {getInterviewCriteriaList(selectedInterview).map((crit) => (
+                        <span key={crit} className="urja-criteria-tag" style={{ fontSize: '0.72rem', padding: '0.15rem 0.45rem' }}>
+                          <i className="bi bi-check2 text-success me-1"></i>{crit}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Star Ratings */}
                 <div className="row g-3">
                   <div className="col-md-4">
@@ -2811,6 +2890,20 @@ export default function InterviewsManagementView({
                   </div>
                 </div>
               </div>
+
+              {/* Display Focus Areas & Criteria chips */}
+              {getInterviewCriteriaList(selectedInterview).length > 0 && (
+                <div>
+                  <small className="text-muted d-block fw-bold mb-1" style={{ fontSize: '0.74rem' }}>EVALUATION FOCUS AREAS & CRITERIA</small>
+                  <div className="d-flex flex-wrap gap-1 p-2 rounded" style={{ background: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+                    {getInterviewCriteriaList(selectedInterview).map((crit) => (
+                      <span key={crit} className="urja-criteria-tag" style={{ fontSize: '0.74rem', padding: '0.18rem 0.5rem' }}>
+                        <i className="bi bi-check2 text-success me-1"></i>{crit}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {selectedInterview.instructions && (
                 <div>

@@ -63,11 +63,11 @@ public class EmployeeService {
                 .noticePeriod(noticePeriod)
                 .resignedExited(resignedExited)
                 .newJoinersThisMonth(newJoinersThisMonth)
-                .totalEmployeesTrend("↑ 4% vs last month")
-                .activeEmployeesTrend("↑ 3% vs last month")
+                .totalEmployeesTrend(total > 0 ? "Active records" : "0% vs last month")
+                .activeEmployeesTrend(active > 0 ? "Active records" : "0% vs last month")
                 .onProbationTrend("0% vs last month")
-                .resignedExitedTrend("↑ 50% vs last month")
-                .newJoinersTrend("↑ 67% vs last month")
+                .resignedExitedTrend("0% vs last month")
+                .newJoinersTrend(newJoinersThisMonth > 0 ? ("+" + newJoinersThisMonth + " this month") : "0 new joiners")
                 .build();
     }
 

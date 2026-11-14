@@ -1,28 +1,25 @@
 package com.company.hr.controller;
 
 import com.company.hr.dto.ApiResponse;
+import com.company.hr.dto.CandidateProfileResponseDto;
 import com.company.hr.dto.CandidateRequest;
+import com.company.hr.dto.CandidateStatsDto;
 import com.company.hr.entity.Candidate;
+import com.company.hr.entity.CandidateDocument;
+import com.company.hr.security.UserPrincipal;
 import com.company.hr.service.CandidateService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import com.company.hr.dto.CandidateStatsDto;
-import com.company.hr.entity.CandidateDocument;
-import com.company.hr.security.UserPrincipal;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.web.PageableDefault;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -30,6 +27,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 
 @RestController
@@ -100,6 +99,27 @@ public class CandidateController {
         return ResponseEntity.ok(ApiResponse.ok(candidate));
     }
 
+    @GetMapping("/{id}/profile")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Get authentic candidate profile, extracted resume content, interviews, feedback, and history")
+    public ResponseEntity<ApiResponse<CandidateProfileResponseDto>> getCandidateProfile(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        CandidateProfileResponseDto profile = candidateService.getCandidateProfile(id, currentUser);
+        return ResponseEntity.ok(ApiResponse.ok(profile));
+    }
+
+    @PatchMapping("/{id}/verify")
+    @PreAuthorize("hasRole('HR_ADMIN')")
+    @Operation(summary = "Explicitly verify or unverify a candidate profile (HR Admin only)")
+    public ResponseEntity<ApiResponse<Candidate>> verifyCandidate(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "true") boolean verified,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        Candidate candidate = candidateService.verifyCandidate(id, verified, currentUser);
+        return ResponseEntity.ok(ApiResponse.ok(candidate, verified ? "Candidate verified" : "Verification removed"));
+    }
+
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasAnyRole('HR_ADMIN', 'HR_RECRUITER')")
     @Operation(summary = "Update candidate pipeline status (Screening, Interview, Offer, Joined, Rejected)")
@@ -119,7 +139,7 @@ public class CandidateController {
     }
 
     @PostMapping("/{id}/resume")
-    @PreAuthorize("hasAnyRole('HR_ADMIN', 'HR_RECRUITER')")
+    @PreAuthorize("hasAnyRole('IT_ADMIN', 'HR_ADMIN', 'HR_RECRUITER')")
     @Operation(summary = "Upload candidate resume file")
     public ResponseEntity<ApiResponse<CandidateDocument>> uploadResume(
             @PathVariable Long id,
@@ -127,5 +147,25 @@ public class CandidateController {
             @AuthenticationPrincipal UserPrincipal currentUser) throws IOException {
         CandidateDocument doc = candidateService.uploadResume(id, file, currentUser);
         return ResponseEntity.ok(ApiResponse.ok(doc, "Resume uploaded successfully"));
+    }
+
+    @GetMapping("/{id}/resume/download")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Download original uploaded candidate resume file")
+    public ResponseEntity<Resource> downloadResume(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long documentId,
+            @AuthenticationPrincipal UserPrincipal currentUser) throws IOException {
+        CandidateDocument doc = candidateService.getResumeDocumentForDownload(id, documentId, currentUser);
+        Path filePath = Paths.get(doc.getStorageKey()).normalize();
+        Resource resource = new UrlResource(filePath.toUri());
+        if (!resource.exists() || !resource.isReadable()) {
+            return ResponseEntity.notFound().build();
+        }
+        String safeFileName = doc.getFileName() != null ? doc.getFileName().replace("\"", "") : "resume.pdf";
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + safeFileName + "\"")
+                .body(resource);
     }
 }

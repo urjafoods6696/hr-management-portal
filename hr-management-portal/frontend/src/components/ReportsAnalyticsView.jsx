@@ -37,6 +37,46 @@ export default function ReportsAnalyticsView({ currentUser, onToast }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Dynamic Metrics State from Backend
+  const [stats, setStats] = useState({
+    totalRequisitions: 0,
+    totalOpenVacancies: 0,
+    avgTatDays: 0,
+    offerAcceptanceRate: 0,
+    activeCandidates: 0,
+    statusBreakdown: {},
+    departmentBreakdown: {}
+  });
+
+  useEffect(() => {
+    const token = typeof window !== 'undefined' ? (sessionStorage.getItem('ats_urja_token') || currentUser?.token) : null;
+    if (!token) return;
+
+    fetch('http://localhost:8080/api/v1/dashboard/summary', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(res => res.ok ? res.json() : null)
+      .then(body => {
+        if (body && body.data) {
+          const d = body.data;
+          let totalReqs = 0;
+          if (d.statusBreakdown) {
+            totalReqs = Object.values(d.statusBreakdown).reduce((a, b) => a + Number(b), 0);
+          }
+          setStats({
+            totalRequisitions: totalReqs,
+            totalOpenVacancies: d.totalOpenVacancies || 0,
+            avgTatDays: d.avgTatDays || 0,
+            offerAcceptanceRate: d.activeCandidates > 0 ? (d.offerRatio || 0) : 0,
+            activeCandidates: d.activeCandidates || 0,
+            statusBreakdown: d.statusBreakdown || {},
+            departmentBreakdown: d.departmentBreakdown || {}
+          });
+        }
+      })
+      .catch(err => console.warn('Could not fetch reports dashboard summary:', err));
+  }, [currentUser]);
+
   // Active Drill-down Drawer State
   const [activeDrilldown, setActiveDrilldown] = useState(null);
 
@@ -44,15 +84,12 @@ export default function ReportsAnalyticsView({ currentUser, onToast }) {
   const [showPerfInfo, setShowPerfInfo] = useState(false);
   const [isPerfExpanded, setIsPerfExpanded] = useState(false);
 
-  // Initial Monthly Performance Data (Recharts) - Matching Enterprise Design Reference
-  const monthlyHiringData = [
-    { month: 'May 2026', applications: 210, interviews: 62, joined: 12 },
-    { month: 'Jun 2026', applications: 245, interviews: 64, joined: 14 },
-    { month: 'Jul 2026', applications: 295, interviews: 78, joined: 18 },
-    { month: 'Aug 2026', applications: 310, interviews: 85, joined: 16 },
-    { month: 'Sep 2026', applications: 290, interviews: 76, joined: 15 },
-    { month: 'Oct 2026', applications: 340, interviews: 92, joined: 20 }
-  ];
+  const monthlyHiringData = useMemo(() => {
+    if (!stats.totalRequisitions && !stats.activeCandidates) {
+      return [{ month: 'Current', applications: 0, interviews: 0, joined: 0 }];
+    }
+    return [{ month: 'Current', applications: stats.activeCandidates, interviews: 0, joined: 0 }];
+  }, [stats]);
 
   // Custom renderers for Monthly Hiring Performance chart
   const renderCustomBarLabel = (props) => {
@@ -229,138 +266,43 @@ export default function ReportsAnalyticsView({ currentUser, onToast }) {
   };
 
   // Recruitment Funnel Stages Data
-  const funnelStages = [
-    { stage: 'Applied', count: 340, percent: 100, drop: '0%', color: '#087B55' },
-    { stage: 'Screened', count: 185, percent: 54.4, drop: '45.6%', color: '#0E9367' },
-    { stage: 'Shortlisted', count: 96, percent: 28.2, drop: '26.2%', color: '#16A36A' },
-    { stage: 'Interviewed', count: 48, percent: 14.1, drop: '14.1%', color: '#22C55E' },
-    { stage: 'Offered', count: 18, percent: 5.3, drop: '8.8%', color: '#38BDF8' },
-    { stage: 'Joined', count: 15, percent: 4.4, drop: '0.9%', color: '#6366F1' }
-  ];
+  const funnelStages = useMemo(() => {
+    return [
+      { stage: 'Applied', count: stats.activeCandidates, percent: stats.activeCandidates > 0 ? 100 : 0, drop: '0%', color: '#087B55' },
+      { stage: 'Screened', count: 0, percent: 0, drop: '0%', color: '#0E9367' },
+      { stage: 'Shortlisted', count: 0, percent: 0, drop: '0%', color: '#16A36A' },
+      { stage: 'Interviewed', count: 0, percent: 0, drop: '0%', color: '#22C55E' },
+      { stage: 'Offered', count: 0, percent: 0, drop: '0%', color: '#38BDF8' },
+      { stage: 'Joined', count: 0, percent: 0, drop: '0%', color: '#6366F1' }
+    ];
+  }, [stats.activeCandidates]);
 
   // Candidate Source Donut Data
-  const sourceAnalyticsData = [
-    { name: 'Job Portals', value: 38, count: 129, color: '#087B55' },
-    { name: 'Employee Referrals', value: 24, count: 82, color: '#16A36A' },
-    { name: 'Campus Recruitment', value: 16, count: 54, color: '#2563EB' },
-    { name: 'Careers Portal', value: 12, count: 41, color: '#0D9488' },
-    { name: 'Recruitment Agencies', value: 6, count: 20, color: '#F59E0B' },
-    { name: 'Walk-ins', value: 4, count: 14, color: '#8B5CF6' }
-  ];
+  const sourceAnalyticsData = useMemo(() => {
+    if (!stats.activeCandidates) return [];
+    return [{ name: 'Portal', value: 100, count: stats.activeCandidates, color: '#087B55' }];
+  }, [stats.activeCandidates]);
 
   // Department Hiring Progress Data
-  const departmentAnalyticsList = [
-    {
-      id: 1,
-      name: 'Engineering & IT',
-      requisitioned: 20,
-      filled: 12,
-      open: 8,
-      avgTat: '16 Days',
-      budget: '₹48.5 L',
-      slaStatus: 'ON_TRACK',
-      completionRate: 60
-    },
-    {
-      id: 2,
-      name: 'Plant Operations',
-      requisitioned: 12,
-      filled: 9,
-      open: 3,
-      avgTat: '14 Days',
-      budget: '₹28.0 L',
-      slaStatus: 'ON_TRACK',
-      completionRate: 75
-    },
-    {
-      id: 3,
-      name: 'Quality & Compliance',
-      requisitioned: 5,
-      filled: 4,
-      open: 1,
-      avgTat: '21 Days',
-      budget: '₹14.2 L',
-      slaStatus: 'ON_TRACK',
-      completionRate: 80
-    },
-    {
-      id: 4,
-      name: 'Human Resources',
-      requisitioned: 4,
-      filled: 3,
-      open: 1,
-      avgTat: '19 Days',
-      budget: '₹11.8 L',
-      slaStatus: 'ON_TRACK',
-      completionRate: 75
-    },
-    {
-      id: 5,
-      name: 'Supply Chain & Logistics',
-      requisitioned: 4,
-      filled: 3,
-      open: 1,
-      avgTat: '24 Days',
-      budget: '₹12.5 L',
-      slaStatus: 'AT_RISK',
-      completionRate: 75
-    },
-    {
-      id: 6,
-      name: 'Finance & Accounts',
-      requisitioned: 3,
-      filled: 2,
-      open: 1,
-      avgTat: '28 Days',
-      budget: '₹16.0 L',
-      slaStatus: 'ON_TRACK',
-      completionRate: 67
+  const departmentAnalyticsList = useMemo(() => {
+    if (!stats.departmentBreakdown || Object.keys(stats.departmentBreakdown).length === 0) {
+      return [];
     }
-  ];
+    return Object.entries(stats.departmentBreakdown).map(([deptName, vacancies], idx) => ({
+      id: idx + 1,
+      name: deptName,
+      requisitioned: vacancies,
+      filled: 0,
+      open: vacancies,
+      avgTat: `${stats.avgTatDays || 0} Days`,
+      budget: '₹0 L',
+      slaStatus: 'ON_TRACK',
+      completionRate: 0
+    }));
+  }, [stats]);
 
   // Recent Hiring Activity List
-  const recentActivities = [
-    {
-      id: 1,
-      candidate: 'Amit Patil',
-      role: 'Senior Software Engineer',
-      dept: 'Engineering & IT',
-      action: 'Offer Accepted & Joining Nov 1',
-      date: 'Today, 10:45 AM',
-      avatarText: 'AP',
-      status: 'Joined'
-    },
-    {
-      id: 2,
-      candidate: 'Neha Joshi',
-      role: 'HR Executive',
-      dept: 'Human Resources',
-      action: 'Offer Letter Dispatched',
-      date: 'Yesterday, 04:20 PM',
-      avatarText: 'NJ',
-      status: 'Offered'
-    },
-    {
-      id: 3,
-      candidate: 'Vikram Desai',
-      role: 'Plant Operator (Solvent Unit)',
-      dept: 'Plant Operations',
-      action: 'Technical Panel Cleared',
-      date: '05 Nov 2026',
-      avatarText: 'VD',
-      status: 'Interviewed'
-    },
-    {
-      id: 4,
-      candidate: 'Anita Kulkarni',
-      role: 'QA Automation Lead',
-      dept: 'Quality & Compliance',
-      action: 'Final Management Review',
-      date: '04 Nov 2026',
-      avatarText: 'AK',
-      status: 'Shortlisted'
-    }
-  ];
+  const recentActivities = [];
 
   // Close drill-down drawer when user presses Escape
   useEffect(() => {
@@ -649,7 +591,7 @@ export default function ReportsAnalyticsView({ currentUser, onToast }) {
           <div className="urja-kpi-top">
             <div>
               <div className="urja-kpi-label">Total Requisitions</div>
-              <div className="urja-kpi-val">28</div>
+              <div className="urja-kpi-val">{stats.totalRequisitions}</div>
             </div>
             <div className="urja-kpi-icon-pill blue">
               <i className="bi bi-briefcase"></i>
@@ -683,7 +625,7 @@ export default function ReportsAnalyticsView({ currentUser, onToast }) {
           <div className="urja-kpi-top">
             <div>
               <div className="urja-kpi-label">Active Vacancies</div>
-              <div className="urja-kpi-val">14</div>
+              <div className="urja-kpi-val">{stats.totalOpenVacancies}</div>
             </div>
             <div className="urja-kpi-icon-pill orange">
               <i className="bi bi-person-plus"></i>
@@ -717,7 +659,7 @@ export default function ReportsAnalyticsView({ currentUser, onToast }) {
           <div className="urja-kpi-top">
             <div>
               <div className="urja-kpi-label">Avg. Time to Hire</div>
-              <div className="urja-kpi-val">18 <span style={{ fontSize: '1.1rem', fontWeight: 600 }}>Days</span></div>
+              <div className="urja-kpi-val">{stats.avgTatDays} <span style={{ fontSize: '1.1rem', fontWeight: 600 }}>Days</span></div>
             </div>
             <div className="urja-kpi-icon-pill green">
               <i className="bi bi-stopwatch"></i>
@@ -751,7 +693,7 @@ export default function ReportsAnalyticsView({ currentUser, onToast }) {
           <div className="urja-kpi-top">
             <div>
               <div className="urja-kpi-label">Offer Acceptance Rate</div>
-              <div className="urja-kpi-val">88.5%</div>
+              <div className="urja-kpi-val">{stats.offerAcceptanceRate}%</div>
             </div>
             <div className="urja-kpi-icon-pill emerald">
               <i className="bi bi-patch-check"></i>

@@ -135,20 +135,20 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
           setStats(prev => ({
             totalUsers: prev.totalUsers || normalized.length,
             activeUsers: prev.activeUsers || normalized.filter(x => x.status === 'ACTIVE').length,
-            inactiveUsers: prev.inactiveUsers || normalized.filter(x => x.status !== 'ACTIVE').length,
-            pendingTasks: prev.pendingTasks || 11
+            inactiveUsers: prev.inactiveUsers !== undefined ? prev.inactiveUsers : normalized.filter(x => x.status !== 'ACTIVE').length,
+            pendingTasks: prev.pendingTasks || 0
           }));
         }
       })
       .catch(err => {
         setIsLoading(false);
-        console.warn('Backend users API error, using initial list:', err);
-        setUsers(INITIAL_USERS);
+        console.warn('Backend users API error:', err);
+        setUsers([]);
         setStats({
-          totalUsers: INITIAL_USERS.length,
-          activeUsers: INITIAL_USERS.filter(x => x.status === 'ACTIVE').length,
-          inactiveUsers: INITIAL_USERS.filter(x => x.status !== 'ACTIVE').length,
-          pendingTasks: 11
+          totalUsers: 0,
+          activeUsers: 0,
+          inactiveUsers: 0,
+          pendingTasks: 0
         });
       });
 
@@ -403,7 +403,8 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
       email: trimmedEmail,
       roles: [editUserForm.role],
       departmentId: Number(editUserForm.departmentId) || 3,
-      status: editUserForm.status || 'ACTIVE'
+      status: editUserForm.status || 'ACTIVE',
+      ...(editUserForm.password ? { password: editUserForm.password.trim() } : {})
     };
 
     fetch(`http://localhost:8080/api/v1/admin/users/${editingUser.id}`, {
@@ -594,7 +595,7 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
         </div>
 
         <div className="urja-usermgmt-header-actions">
-          <button 
+          <button
             type="button"
             className="urja-usermgmt-btn-refresh"
             onClick={() => { fetchUsers(); fetchStats(); }}
@@ -605,7 +606,7 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
             <span>Refresh</span>
           </button>
 
-          <button 
+          <button
             type="button"
             className="urja-usermgmt-btn-assign-tasks"
             onClick={() => {
@@ -618,7 +619,7 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
             <span>Assign Tasks</span>
           </button>
 
-          <button 
+          <button
             type="button"
             className="urja-usermgmt-btn-add-user"
             onClick={() => setShowAddModal(true)}
@@ -645,7 +646,7 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
             <div className="urja-usermgmt-stat-label">Total Users</div>
           </div>
           <svg className="urja-usermgmt-stat-wave" viewBox="0 0 100 80" fill="none">
-            <path d="M0 80 C 40 40, 60 70, 100 20 L 100 80 Z" fill="#E8F6ED" opacity="0.6"/>
+            <path d="M0 80 C 40 40, 60 70, 100 20 L 100 80 Z" fill="#E8F6ED" opacity="0.6" />
           </svg>
         </div>
 
@@ -659,7 +660,7 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
             <div className="urja-usermgmt-stat-label">Active Users</div>
           </div>
           <svg className="urja-usermgmt-stat-wave" viewBox="0 0 100 80" fill="none">
-            <path d="M0 80 C 40 35, 65 65, 100 15 L 100 80 Z" fill="#DCFCE7" opacity="0.7"/>
+            <path d="M0 80 C 40 35, 65 65, 100 15 L 100 80 Z" fill="#DCFCE7" opacity="0.7" />
           </svg>
         </div>
 
@@ -673,7 +674,7 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
             <div className="urja-usermgmt-stat-label">Inactive Users</div>
           </div>
           <svg className="urja-usermgmt-stat-wave" viewBox="0 0 100 80" fill="none">
-            <path d="M0 80 C 35 45, 60 75, 100 25 L 100 80 Z" fill="#FEE2E2" opacity="0.6"/>
+            <path d="M0 80 C 35 45, 60 75, 100 25 L 100 80 Z" fill="#FEE2E2" opacity="0.6" />
           </svg>
         </div>
 
@@ -687,7 +688,7 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
             <div className="urja-usermgmt-stat-label">Pending Tasks</div>
           </div>
           <svg className="urja-usermgmt-stat-wave" viewBox="0 0 100 80" fill="none">
-            <path d="M0 80 C 40 35, 65 65, 100 20 L 100 80 Z" fill="#FEF3C7" opacity="0.6"/>
+            <path d="M0 80 C 40 35, 65 65, 100 20 L 100 80 Z" fill="#FEF3C7" opacity="0.6" />
           </svg>
         </div>
       </div>
@@ -699,8 +700,8 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
         {/* Left: Search Bar with integrated Search button */}
         <div className="urja-usermgmt-search-box">
           <i className="bi bi-search urja-usermgmt-search-icon"></i>
-          <input 
-            type="text" 
+          <input
+            type="text"
             className="urja-usermgmt-search-input"
             placeholder="Search by user name, work email, or designation..."
             value={searchQuery}
@@ -708,17 +709,17 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
             onKeyDown={e => { if (e.key === 'Enter') handleApplyFilters(); }}
           />
           {searchQuery && (
-            <button 
-              type="button" 
-              className="urja-usermgmt-search-clear" 
+            <button
+              type="button"
+              className="urja-usermgmt-search-clear"
               onClick={() => { setSearchQuery(''); setAppliedSearch(''); setCurrentPage(1); }}
               title="Clear search"
             >
               <i className="bi bi-x-circle-fill"></i>
             </button>
           )}
-          <button 
-            type="button" 
+          <button
+            type="button"
             className="urja-usermgmt-search-btn"
             onClick={handleApplyFilters}
           >
@@ -732,7 +733,7 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
             {/* Filter 1: Role */}
             <div className="urja-usermgmt-select-wrap">
               <i className="bi bi-layers urja-usermgmt-select-icon"></i>
-              <select 
+              <select
                 className="urja-usermgmt-select"
                 value={filterRole}
                 onChange={e => { setFilterRole(e.target.value); setCurrentPage(1); }}
@@ -750,7 +751,7 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
             {/* Filter 2: Department */}
             <div className="urja-usermgmt-select-wrap">
               <i className="bi bi-building urja-usermgmt-select-icon"></i>
-              <select 
+              <select
                 className="urja-usermgmt-select"
                 value={filterDept}
                 onChange={e => { setFilterDept(e.target.value); setCurrentPage(1); }}
@@ -768,7 +769,7 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
             {/* Filter 3: Account Status */}
             <div className="urja-usermgmt-select-wrap">
               <i className="bi bi-shield-check urja-usermgmt-select-icon"></i>
-              <select 
+              <select
                 className="urja-usermgmt-select"
                 value={filterStatus}
                 onChange={e => { setFilterStatus(e.target.value); setCurrentPage(1); }}
@@ -782,7 +783,7 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
             {/* Filter 4: Task Status */}
             <div className="urja-usermgmt-select-wrap">
               <i className="bi bi-list-task urja-usermgmt-select-icon"></i>
-              <select 
+              <select
                 className="urja-usermgmt-select"
                 value={filterTaskAssign}
                 onChange={e => { setFilterTaskAssign(e.target.value); setCurrentPage(1); }}
@@ -795,8 +796,8 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
           </div>
 
           <div className="urja-usermgmt-filter-actions">
-            <button 
-              type="button" 
+            <button
+              type="button"
               className="urja-usermgmt-btn-clear"
               onClick={handleClearFilters}
               title="Reset all filters"
@@ -805,8 +806,8 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
               <span>Clear</span>
             </button>
 
-            <button 
-              type="button" 
+            <button
+              type="button"
               className="urja-usermgmt-btn-apply"
               onClick={handleApplyFilters}
             >
@@ -822,8 +823,8 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
           ======================================================================== */}
       <div className="urja-usermgmt-selection-strip">
         <label className="urja-usermgmt-select-all-label">
-          <input 
-            type="checkbox" 
+          <input
+            type="checkbox"
             className="urja-usermgmt-checkbox"
             checked={isAllSelectableSelected}
             onChange={handleSelectAll}
@@ -831,7 +832,7 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
           <span>{selectedUserIds.length} selected</span>
         </label>
 
-        <button 
+        <button
           type="button"
           className={`urja-usermgmt-btn-delete-bulk ${selectedUserIds.length > 0 ? 'active' : 'disabled'}`}
           disabled={selectedUserIds.length === 0}
@@ -852,15 +853,15 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
             <thead>
               <tr>
                 <th style={{ width: 38, textAlign: 'center' }}>
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     className="urja-usermgmt-checkbox"
                     checked={isAllSelectableSelected}
                     onChange={handleSelectAll}
                     title="Select / Deselect all"
                   />
                 </th>
-                <th 
+                <th
                   style={{ cursor: 'pointer', userSelect: 'none' }}
                   onClick={() => {
                     if (sortField === 'name') setSortAsc(!sortAsc);
@@ -908,8 +909,8 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
                     <tr key={u.id} className={isSelected ? 'selected' : ''}>
                       {/* Checkbox */}
                       <td style={{ textAlign: 'center' }}>
-                        <input 
-                          type="checkbox" 
+                        <input
+                          type="checkbox"
                           className="urja-usermgmt-checkbox"
                           checked={isSelected}
                           disabled={isProtected}
@@ -972,7 +973,7 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
 
                       {/* Assigned Tasks */}
                       <td style={{ textAlign: 'center' }}>
-                        <span 
+                        <span
                           className={`urja-tasks-pill ${taskCount > 0 ? 'has-tasks' : 'zero'}`}
                           onClick={() => handleOpenDetails(u)}
                           title="Click to view assigned tasks"
@@ -985,8 +986,8 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
                       {/* Actions: Mandatory [Details] [Edit] [Delete] */}
                       <td style={{ textAlign: 'center' }}>
                         <div className="urja-row-actions">
-                          <button 
-                            type="button" 
+                          <button
+                            type="button"
                             className="urja-btn-row-details"
                             onClick={() => handleOpenDetails(u)}
                             title="View Details"
@@ -995,8 +996,8 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
                             <span>Details</span>
                           </button>
 
-                          <button 
-                            type="button" 
+                          <button
+                            type="button"
                             className="urja-btn-row-icon edit"
                             title="Edit User"
                             onClick={() => {
@@ -1004,6 +1005,7 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
                               setEditUserForm({
                                 name: u.name,
                                 email: u.email,
+                                password: u.password || '',
                                 role: u.role || 'ROLE_HR_RECRUITER',
                                 departmentId: u.departmentId || 3,
                                 status: u.status || 'ACTIVE'
@@ -1014,14 +1016,14 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
                             <i className="bi bi-pencil-square"></i>
                           </button>
 
-                          <button 
-                            type="button" 
+                          <button
+                            type="button"
                             className={`urja-btn-row-icon delete ${isActive ? 'deactivate' : 'permanent'}`}
                             title={
-                              isProtected 
-                                ? 'Protected system account cannot be modified' 
-                                : isActive 
-                                  ? 'Deactivate User' 
+                              isProtected
+                                ? 'Protected system account cannot be modified'
+                                : isActive
+                                  ? 'Deactivate User'
                                   : 'Permanently Delete User'
                             }
                             disabled={isProtected}
@@ -1051,7 +1053,7 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
           <div className="urja-usermgmt-pagination-controls">
             <div className="urja-usermgmt-rows-selector">
               <span>Rows per page:</span>
-              <select 
+              <select
                 className="urja-usermgmt-rows-select"
                 value={rowsPerPage}
                 onChange={e => {
@@ -1066,7 +1068,7 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
             </div>
 
             <div className="urja-usermgmt-page-buttons">
-              <button 
+              <button
                 type="button"
                 className="urja-usermgmt-page-btn"
                 disabled={currentPage === 1}
@@ -1077,7 +1079,7 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
               </button>
 
               {Array.from({ length: totalPages }, (_, idx) => idx + 1).map(pageNum => (
-                <button 
+                <button
                   key={pageNum}
                   type="button"
                   className={`urja-usermgmt-page-btn ${currentPage === pageNum ? 'active' : ''}`}
@@ -1087,7 +1089,7 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
                 </button>
               ))}
 
-              <button 
+              <button
                 type="button"
                 className="urja-usermgmt-page-btn"
                 disabled={currentPage >= totalPages}
@@ -1119,8 +1121,8 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
               <div className="urja-mgmt-modal-body">
                 <div className="mb-3">
                   <label className="form-label small fw-bold text-dark">Full Name *</label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     className="form-control"
                     placeholder="e.g. Ramesh Kulkarni"
                     value={newUserForm.name}
@@ -1132,8 +1134,8 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
                 <div className="row g-3 mb-3">
                   <div className="col-md-6">
                     <label className="form-label small fw-bold text-dark">Work Email *</label>
-                    <input 
-                      type="email" 
+                    <input
+                      type="email"
                       className="form-control"
                       placeholder="ramesh.kulkarni@company.com"
                       value={newUserForm.email}
@@ -1144,8 +1146,8 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
 
                   <div className="col-md-6">
                     <label className="form-label small fw-bold text-dark">Username</label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       className="form-control"
                       placeholder="ramesh.k"
                       value={newUserForm.username}
@@ -1157,7 +1159,7 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
                 <div className="row g-3 mb-3">
                   <div className="col-md-6">
                     <label className="form-label small fw-bold text-dark">System Role *</label>
-                    <select 
+                    <select
                       className="form-select"
                       value={newUserForm.role}
                       onChange={e => setNewUserForm({ ...newUserForm, role: e.target.value })}
@@ -1173,7 +1175,7 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
 
                   <div className="col-md-6">
                     <label className="form-label small fw-bold text-dark">Department</label>
-                    <select 
+                    <select
                       className="form-select"
                       value={newUserForm.departmentId}
                       onChange={e => setNewUserForm({ ...newUserForm, departmentId: Number(e.target.value) })}
@@ -1189,8 +1191,8 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
 
                 <div className="mb-3">
                   <label className="form-label small fw-bold text-dark">Designation</label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     className="form-control"
                     placeholder="e.g. Senior Talent Acquisition Specialist"
                     value={newUserForm.designation}
@@ -1201,8 +1203,8 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
                 <div className="row g-3 mb-3">
                   <div className="col-md-6">
                     <label className="form-label small fw-bold text-dark">Initial Password</label>
-                    <input 
-                      type="password" 
+                    <input
+                      type="password"
                       className="form-control"
                       value={newUserForm.password}
                       onChange={e => setNewUserForm({ ...newUserForm, password: e.target.value })}
@@ -1212,7 +1214,7 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
 
                   <div className="col-md-6">
                     <label className="form-label small fw-bold text-dark">Account Status</label>
-                    <select 
+                    <select
                       className="form-select"
                       value={newUserForm.status}
                       onChange={e => setNewUserForm({ ...newUserForm, status: e.target.value })}
@@ -1256,8 +1258,8 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
               <div className="urja-mgmt-modal-body">
                 <div className="mb-3">
                   <label className="form-label small fw-bold text-dark">Full Name *</label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     className="form-control"
                     value={editUserForm.name}
                     onChange={e => setEditUserForm({ ...editUserForm, name: e.target.value })}
@@ -1267,8 +1269,8 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
 
                 <div className="mb-3">
                   <label className="form-label small fw-bold text-dark">Work Email *</label>
-                  <input 
-                    type="email" 
+                  <input
+                    type="email"
                     className="form-control"
                     value={editUserForm.email}
                     onChange={e => setEditUserForm({ ...editUserForm, email: e.target.value })}
@@ -1279,7 +1281,7 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
                 <div className="row g-3 mb-3">
                   <div className="col-md-6">
                     <label className="form-label small fw-bold text-dark">System Role *</label>
-                    <select 
+                    <select
                       className="form-select"
                       value={editUserForm.role}
                       onChange={e => setEditUserForm({ ...editUserForm, role: e.target.value })}
@@ -1295,7 +1297,7 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
 
                   <div className="col-md-6">
                     <label className="form-label small fw-bold text-dark">Department</label>
-                    <select 
+                    <select
                       className="form-select"
                       value={editUserForm.departmentId}
                       onChange={e => setEditUserForm({ ...editUserForm, departmentId: Number(e.target.value) })}
@@ -1311,7 +1313,7 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
 
                 <div className="mb-3">
                   <label className="form-label small fw-bold text-dark">Account Status</label>
-                  <select 
+                  <select
                     className="form-select"
                     value={editUserForm.status}
                     onChange={e => setEditUserForm({ ...editUserForm, status: e.target.value })}
@@ -1319,6 +1321,18 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
                     <option value="ACTIVE">ACTIVE</option>
                     <option value="INACTIVE">INACTIVE</option>
                   </select>
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label small fw-bold text-dark">Password (Stored in Database)</label>
+                  <input
+                    type="text"
+                    className="form-control font-monospace"
+                    value={editUserForm.password || ''}
+                    placeholder="Enter password to store in database"
+                    onChange={e => setEditUserForm({ ...editUserForm, password: e.target.value })}
+                  />
+                  <small className="text-muted">Stored directly to database password column and hashed with BCrypt.</small>
                 </div>
               </div>
 
@@ -1380,17 +1394,17 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
                 </div>
 
                 <div className="urja-mgmt-modal-footer">
-                  <button 
-                    type="button" 
-                    className="urja-btn-secondary" 
+                  <button
+                    type="button"
+                    className="urja-btn-secondary"
                     onClick={() => setDeleteCandidateUser(null)}
                     disabled={isDeleting}
                   >
                     Cancel
                   </button>
-                  <button 
-                    type="button" 
-                    className="urja-btn-warning-confirm" 
+                  <button
+                    type="button"
+                    className="urja-btn-warning-confirm"
                     onClick={confirmDeactivateUser}
                     disabled={isDeleting}
                   >
@@ -1408,10 +1422,10 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
                     <i className="bi bi-trash-fill text-danger me-2"></i>
                     Permanently Delete Account?
                   </h3>
-                  <button 
-                    type="button" 
-                    className="btn-close" 
-                    onClick={() => !isDeleting && setDeleteCandidateUser(null)} 
+                  <button
+                    type="button"
+                    className="btn-close"
+                    onClick={() => !isDeleting && setDeleteCandidateUser(null)}
                     disabled={isDeleting}
                   ></button>
                 </div>
@@ -1420,7 +1434,7 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
                   <p className="text-dark mb-3 fw-semibold" style={{ fontSize: '0.94rem', lineHeight: 1.5 }}>
                     Are you sure you want to permanently delete this user account? This action cannot be undone.
                   </p>
-                  
+
                   {/* Account Information Card */}
                   <div className="p-3 bg-light rounded-3 border mb-3">
                     <div className="d-flex align-items-center justify-content-between mb-2 pb-2 border-bottom">
@@ -1450,17 +1464,17 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
                 </div>
 
                 <div className="urja-mgmt-modal-footer">
-                  <button 
-                    type="button" 
-                    className="urja-btn-secondary" 
+                  <button
+                    type="button"
+                    className="urja-btn-secondary"
                     onClick={() => setDeleteCandidateUser(null)}
                     disabled={isDeleting}
                   >
                     Cancel
                   </button>
-                  <button 
-                    type="button" 
-                    className="urja-btn-danger-confirm" 
+                  <button
+                    type="button"
+                    className="urja-btn-danger-confirm"
                     onClick={confirmPermanentDelete}
                     disabled={isDeleting}
                   >
@@ -1508,17 +1522,17 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
             </div>
 
             <div className="urja-mgmt-modal-footer">
-              <button 
-                type="button" 
-                className="urja-btn-secondary" 
+              <button
+                type="button"
+                className="urja-btn-secondary"
                 onClick={() => setShowBulkDeleteModal(false)}
                 disabled={isDeleting}
               >
                 Cancel
               </button>
-              <button 
-                type="button" 
-                className="urja-btn-danger-confirm" 
+              <button
+                type="button"
+                className="urja-btn-danger-confirm"
                 onClick={confirmBulkDelete}
                 disabled={isDeleting}
               >
@@ -1576,6 +1590,15 @@ export default function UserManagementView({ currentUser, showToast, onNavigateT
                     <span className="badge bg-primary-subtle text-primary border border-primary-subtle">
                       {viewingUser.assignedTasksCount || 0} Tasks Assigned
                     </span>
+                  </div>
+                  <div className="col-12 mt-2 pt-2 border-top">
+                    <span className="text-muted d-block small">Database Stored Password</span>
+                    <div className="d-flex align-items-center gap-2 mt-1">
+                      <span className="badge bg-light text-dark font-monospace px-2 py-1 border" style={{ fontSize: '0.85rem' }}>
+                        {viewingUser.password || 'password'}
+                      </span>
+                      <small className="text-muted"><i className="bi bi-database-check text-success me-1"></i>Stored in MySQL database</small>
+                    </div>
                   </div>
                 </div>
               </div>

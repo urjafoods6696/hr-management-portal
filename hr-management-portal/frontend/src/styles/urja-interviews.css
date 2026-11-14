@@ -1126,6 +1126,126 @@
   font-weight: 600;
 }
 
+/* Evaluation Criteria Autocomplete & Selected Chips */
+.urja-criteria-autocomplete-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.urja-autocomplete-input-box {
+  position: relative;
+  width: 100%;
+}
+
+.urja-autocomplete-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+  z-index: 1060;
+  overflow: hidden;
+  animation: urjaFadeDown 0.15s ease-out;
+}
+
+@keyframes urjaFadeDown {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.urja-autocomplete-list {
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.urja-autocomplete-item {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+  color: #1E293B;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+.urja-autocomplete-item:last-child {
+  border-bottom: none;
+}
+
+.urja-autocomplete-item:hover,
+.urja-autocomplete-item.active {
+  background: #F0FDF4;
+  color: #15803D;
+}
+
+.urja-autocomplete-custom {
+  background: #FAFDFB;
+  border-top: 1px dashed #86EFAC !important;
+}
+
+.urja-autocomplete-custom:hover,
+.urja-autocomplete-custom.active {
+  background: #DCFCE7 !important;
+}
+
+.urja-autocomplete-empty {
+  color: #64748B;
+  font-size: 0.78rem;
+}
+
+.urja-selected-criteria-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+}
+
+.urja-criteria-tag {
+  display: inline-flex;
+  align-items: center;
+  background: #DCFCE7;
+  border: 1px solid #86EFAC;
+  color: #15803D;
+  font-size: 0.76rem;
+  font-weight: 500;
+  padding: 0.22rem 0.55rem;
+  border-radius: 6px;
+  line-height: 1.25;
+  transition: all 0.15s ease;
+}
+
+.urja-criteria-tag:hover {
+  background: #BBF7D0;
+  border-color: #4ADE80;
+}
+
+.urja-criteria-tag-remove {
+  background: transparent;
+  border: none;
+  color: #166534;
+  font-size: 0.75rem;
+  margin-left: 0.3rem;
+  padding: 0 2px;
+  cursor: pointer;
+  line-height: 1;
+  border-radius: 3px;
+  transition: all 0.12s ease;
+}
+
+.urja-criteria-tag-remove:hover {
+  color: #DC2626;
+  background: rgba(220, 38, 38, 0.1);
+  transform: scale(1.15);
+}
+
 /* Star Rating Widget in Feedback Modal */
 .urja-star-rating-box {
   display: flex;

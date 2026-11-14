@@ -60,7 +60,7 @@ public class DashboardService {
 
         long offersReleased = candidateRepository.countByStatus(Candidate.CandidateStatus.OFFER_EXTENDED);
         long offersAccepted = candidateRepository.countByStatus(Candidate.CandidateStatus.OFFER_ACCEPTED);
-        double offerRatio = (offersReleased > 0) ? ((double) offersAccepted / offersReleased) * 100.0 : 85.0;
+        double offerRatio = (offersReleased > 0) ? ((double) offersAccepted / offersReleased) * 100.0 : 0.0;
 
         List<TatSummaryResponse> tatAlertsList = requisitionService.getOverdueRequisitions();
         long tatAlertCount = tatAlertsList.size();
@@ -87,18 +87,87 @@ public class DashboardService {
                 PageRequest.of(0, 5, Sort.by("createdAt").descending())
         ).stream().map(requisitionService::mapToResponse).collect(Collectors.toList());
 
+        double avgTat = 0.0;
+        List<Requisition> allReqs = requisitionRepository.findAll();
+        if (!allReqs.isEmpty()) {
+            double sumTat = allReqs.stream()
+                    .mapToDouble(r -> tatCalculationService.computeTatSummary(r).getElapsedDays())
+                    .sum();
+            avgTat = Math.round((sumTat / allReqs.size()) * 10.0) / 10.0;
+        }
+
         return DashboardSummaryResponse.builder()
                 .totalOpenVacancies(openVacancies)
                 .pendingApprovals(pendingApprovals)
                 .activeCandidates(totalCandidates)
                 .upcomingInterviewsToday(scheduledInterviews)
                 .overdueRequisitionsCount(tatAlertCount)
-                .avgTatDays(24.5)
+                .avgTatDays(avgTat)
                 .statusBreakdown(statusBreakdown)
                 .departmentBreakdown(deptBreakdown)
                 .recentRequisitions(recent)
                 .tatAlerts(tatAlertsList)
                 .build();
+    }
+
+    private List<PersonalizedDashboardResponse.ActivityDto> getRecentActivities() {
+        List<AuditLog> recentLogs = auditLogRepository.findAll(
+                PageRequest.of(0, 4, Sort.by("timestamp").descending())).getContent();
+
+        return recentLogs.stream().map(l ->
+                PersonalizedDashboardResponse.ActivityDto.builder()
+                        .id("audit-" + l.getId())
+                        .type("feedback")
+                        .title(l.getAction() != null ? l.getAction().replace("_", " ") : "Action")
+                        .subtitle((l.getEntityType() != null ? l.getEntityType() : "System") + " – Actor: " + (l.getActorName() != null ? l.getActorName() : "System"))
+                        .timeAgo(formatTimeAgo(l.getTimestamp()))
+                        .iconColor(l.getAction() != null && (l.getAction().contains("DELETE") || l.getAction().contains("CANCEL")) ? "amber" : "green")
+                        .build()
+        ).collect(Collectors.toList());
+    }
+
+    private List<PersonalizedDashboardResponse.RequisitionItemDto> mapRequisitionsToItems(List<Requisition> reqs) {
+        return reqs.stream().map(r ->
+                PersonalizedDashboardResponse.RequisitionItemDto.builder()
+                        .id(r.getRequisitionCode())
+                        .jobTitle(r.getJobTitle())
+                        .department(r.getDepartment() != null ? r.getDepartment().getDepartmentName() : "General")
+                        .location("Pune")
+                        .status(r.getStatus() != null ? r.getStatus().name() : "OPEN")
+                        .candidateCount(candidateRepository.findByRequisitionId(r.getId()).size())
+                        .build()
+        ).collect(Collectors.toList());
+    }
+
+    private List<PersonalizedDashboardResponse.InterviewItemDto> mapInterviewsToItems(List<Interview> ints) {
+        return ints.stream().map(i -> {
+            LocalDateTime dt = i.getScheduledAt();
+            String day = dt != null ? String.valueOf(dt.getDayOfMonth()) : "";
+            String month = dt != null ? dt.getMonth().name().substring(0, 3) : "";
+            String time = dt != null ? dt.format(DateTimeFormatter.ofPattern("hh:mm a")) : "";
+            String candName = i.getCandidate() != null ? i.getCandidate().getName() : "Candidate";
+            String roleName = i.getRequisition() != null ? i.getRequisition().getJobTitle() : "Interview";
+            return PersonalizedDashboardResponse.InterviewItemDto.builder()
+                    .id(String.valueOf(i.getId()))
+                    .dateDay(day)
+                    .dateMonth(month)
+                    .candidateName(candName)
+                    .role(roleName)
+                    .time(time)
+                    .mode(i.getMeetingLocation() != null && i.getMeetingLocation().toLowerCase().contains("online") ? "Online" : "Onsite")
+                    .build();
+        }).collect(Collectors.toList());
+    }
+
+    private List<PersonalizedDashboardResponse.TaskItemDto> mapTasksToItems(List<RecruitmentTask> tasks) {
+        return tasks.stream().map(t ->
+                PersonalizedDashboardResponse.TaskItemDto.builder()
+                        .id("tsk-" + t.getId())
+                        .title(t.getTaskTitle())
+                        .dueDate(t.getDueDate() != null ? t.getDueDate().toString() : "")
+                        .completed(t.getStatus() == RecruitmentTask.TaskStatus.COMPLETED)
+                        .build()
+        ).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
@@ -133,6 +202,8 @@ public class DashboardService {
                 .roles(roles)
                 .build();
 
+        List<PersonalizedDashboardResponse.ActivityDto> activities = getRecentActivities();
+
         // 1. IT ADMIN DASHBOARD
         if (isITAdmin && !isHRAdmin) {
             long totalUsers = userRepository.count();
@@ -140,28 +211,9 @@ public class DashboardService {
             long totalPolicies = accessPolicyRepository.count();
             long totalAuditLogs = auditLogRepository.count();
 
-            List<AuditLog> recentLogs = auditLogRepository.findAll(
-                    PageRequest.of(0, 4, Sort.by("timestamp").descending())).getContent();
-
-            List<PersonalizedDashboardResponse.ActivityDto> activities = recentLogs.stream().map(l ->
-                    PersonalizedDashboardResponse.ActivityDto.builder()
-                            .id("audit-" + l.getId())
-                            .type("feedback")
-                            .title(l.getAction().replace("_", " "))
-                            .subtitle(l.getEntityType() + " – Actor: " + (l.getActorName() != null ? l.getActorName() : "System"))
-                            .timeAgo(formatTimeAgo(l.getTimestamp()))
-                            .iconColor(l.getAction().contains("DELETE") || l.getAction().contains("CANCEL") ? "amber" : "green")
-                            .build()
-            ).collect(Collectors.toList());
-
-            if (activities.isEmpty()) {
-                activities = List.of(
-                        PersonalizedDashboardResponse.ActivityDto.builder().id("a1").type("feedback").title("Security Policy Updated").subtitle("it_admin_candidate_access set to restricted").timeAgo("10 minutes ago").iconColor("green").build(),
-                        PersonalizedDashboardResponse.ActivityDto.builder().id("a2").type("candidate").title("User Account Created").subtitle("arjun.tech@company.com (ROLE_INTERVIEWER)").timeAgo("1 hour ago").iconColor("blue").build(),
-                        PersonalizedDashboardResponse.ActivityDto.builder().id("a3").type("interview").title("Automated DB Backup").subtitle("Full snapshot db_backup_20261024.sql.gz (14.5 MB)").timeAgo("4 hours ago").iconColor("purple").build(),
-                        PersonalizedDashboardResponse.ActivityDto.builder().id("a4").type("offer").title("System Bootstrapped").subtitle("Flyway migrations V1–V4 applied successfully").timeAgo("1 day ago").iconColor("amber").build()
-                );
-            }
+            List<Requisition> openReqs = requisitionRepository.findAll(PageRequest.of(0, 4, Sort.by("createdAt").descending())).getContent();
+            List<Interview> upcomingInts = interviewRepository.findAll(PageRequest.of(0, 3, Sort.by("scheduledAt").descending())).getContent();
+            List<RecruitmentTask> myTasks = currentUser != null ? taskRepository.findByAssignedUserId(currentUser.getId()) : List.of();
 
             return PersonalizedDashboardResponse.builder()
                     .user(userDto)
@@ -172,68 +224,27 @@ public class DashboardService {
                             .pendingOffers(totalAuditLogs)
                             .build())
                     .recentActivities(activities)
-                    .openRequisitions(List.of(
-                            PersonalizedDashboardResponse.RequisitionItemDto.builder().id("SYS-01").jobTitle("Identity & Access Management").department("IT & Systems").location("Pune HQ").status("Enforced").candidateCount((int) totalUsers).build(),
-                            PersonalizedDashboardResponse.RequisitionItemDto.builder().id("SYS-02").jobTitle("Access Policies & Security Matrix").department("Security").location("Global").status("Configured").candidateCount((int) totalPolicies).build(),
-                            PersonalizedDashboardResponse.RequisitionItemDto.builder().id("SYS-03").jobTitle("Automated Database Snapshots").department("Database Ops").location("Encrypted S3").status("Healthy").candidateCount(3).build(),
-                            PersonalizedDashboardResponse.RequisitionItemDto.builder().id("SYS-04").jobTitle("Security Audit Trail Logger").department("Compliance").location("Local DB").status("Active").candidateCount((int) totalAuditLogs).build()
-                    ))
-                    .upcomingInterviews(List.of(
-                            PersonalizedDashboardResponse.InterviewItemDto.builder().id("sec-1").dateDay("24").dateMonth("Oct").candidateName("Quarterly Access Review").role("Security Audit").time("02:00 PM").mode("Online").build(),
-                            PersonalizedDashboardResponse.InterviewItemDto.builder().id("sec-2").dateDay("25").dateMonth("Oct").candidateName("Disaster Recovery Dry-Run").role("Database Snapshot").time("11:30 AM").mode("Online").build()
-                    ))
-                    .tasks(List.of(
-                            PersonalizedDashboardResponse.TaskItemDto.builder().id("tsk-it-1").title("Verify daily database backup integrity & checksum").dueDate("24 Oct 2026").completed(false).build(),
-                            PersonalizedDashboardResponse.TaskItemDto.builder().id("tsk-it-2").title("Review quarterly role assignments & permissions").dueDate("25 Oct 2026").completed(false).build(),
-                            PersonalizedDashboardResponse.TaskItemDto.builder().id("tsk-it-3").title("Audit recruitment module access policies").dueDate("26 Oct 2026").completed(false).build(),
-                            PersonalizedDashboardResponse.TaskItemDto.builder().id("tsk-it-4").title("Inspect security audit logs for unauthorized attempts").dueDate("27 Oct 2026").completed(false).build()
-                    ))
+                    .openRequisitions(mapRequisitionsToItems(openReqs))
+                    .upcomingInterviews(mapInterviewsToItems(upcomingInts))
+                    .tasks(mapTasksToItems(myTasks))
                     .build();
         }
 
-        // 2. INTERVIEWER DASHBOARD (e.g. Arjun Varma)
-        if (isInterviewer && !isHRAdmin) {
-            long totalAssignedInterviews = interviewRepository.countByInterviewerId(currentUser.getId());
-            long pendingInterviews = interviewRepository.countByInterviewerIdAndStatus(currentUser.getId(), Interview.InterviewStatus.SCHEDULED);
-            long completedInterviews = interviewRepository.countByInterviewerIdAndStatus(currentUser.getId(), Interview.InterviewStatus.COMPLETED);
-            long pendingTasks = taskRepository.countByAssignedUserIdAndStatus(currentUser.getId(), RecruitmentTask.TaskStatus.PENDING);
+        // 2. ASSIGNED INTERVIEWER / PANEL MEMBER DASHBOARD
+        Long currentUserId = currentUser != null ? currentUser.getId() : 0L;
+        long myInterviewCount = interviewRepository.countByInterviewerId(currentUserId);
 
-            List<Interview> myInterviews = interviewRepository.findByInterviewerId(currentUser.getId());
+        if ((isInterviewer || myInterviewCount > 0) && !isHRAdmin && !isRecruiter && !isITAdmin && !isDeptHead) {
+            long totalAssignedInterviews = myInterviewCount;
+            long pendingInterviews = interviewRepository.countByInterviewerIdAndStatus(currentUserId, Interview.InterviewStatus.SCHEDULED);
+            long completedInterviews = interviewRepository.countByInterviewerIdAndStatus(currentUserId, Interview.InterviewStatus.COMPLETED);
 
-            List<PersonalizedDashboardResponse.InterviewItemDto> upcomingItems = myInterviews.stream()
+            List<Interview> myInterviews = interviewRepository.findByInterviewerId(currentUserId);
+            List<Interview> upcomingItems = myInterviews.stream()
                     .filter(i -> i.getStatus() == Interview.InterviewStatus.SCHEDULED || i.getStatus() == Interview.InterviewStatus.RESCHEDULED)
-                    .map(i -> {
-                        LocalDateTime dt = i.getScheduledAt();
-                        String day = dt != null ? String.valueOf(dt.getDayOfMonth()) : "24";
-                        String month = dt != null ? dt.getMonth().name().substring(0, 3) : "Oct";
-                        String time = dt != null ? dt.format(DateTimeFormatter.ofPattern("hh:mm a")) : "02:00 PM";
-                        return PersonalizedDashboardResponse.InterviewItemDto.builder()
-                                .id(String.valueOf(i.getId()))
-                                .dateDay(day)
-                                .dateMonth(month)
-                                .candidateName(i.getCandidate().getName())
-                                .role(i.getRequisition().getJobTitle() + " (" + i.getRound().name().replace("_", " ") + ")")
-                                .time(time)
-                                .mode(i.getMeetingLocation() != null && i.getMeetingLocation().toLowerCase().contains("online") ? "Online" : "Onsite")
-                                .build();
-                    }).collect(Collectors.toList());
+                    .collect(Collectors.toList());
 
-            List<RecruitmentTask> myTasks = taskRepository.findByAssignedUserId(currentUser.getId());
-            List<PersonalizedDashboardResponse.TaskItemDto> taskItems = myTasks.stream().map(t ->
-                    PersonalizedDashboardResponse.TaskItemDto.builder()
-                            .id("tsk-" + t.getId())
-                            .title(t.getTaskTitle())
-                            .dueDate(t.getDueDate() != null ? t.getDueDate().toString() : "24 Oct 2026")
-                            .completed(t.getStatus() == RecruitmentTask.TaskStatus.COMPLETED)
-                            .build()
-            ).collect(Collectors.toList());
-
-            if (taskItems.isEmpty()) {
-                taskItems = List.of(
-                        PersonalizedDashboardResponse.TaskItemDto.builder().id("tsk-int-1").title("Evaluate candidate: Rohan Mathur – Senior Java Engineer").dueDate("24 Oct 2026").completed(false).build(),
-                        PersonalizedDashboardResponse.TaskItemDto.builder().id("tsk-int-2").title("Submit technical scorecard and rating recommendation").dueDate("24 Oct 2026").completed(false).build()
-                );
-            }
+            List<RecruitmentTask> myTasks = taskRepository.findByAssignedUserId(currentUserId);
 
             return PersonalizedDashboardResponse.builder()
                     .user(userDto)
@@ -243,166 +254,98 @@ public class DashboardService {
                             .interviewsThisWeek(pendingInterviews)
                             .pendingOffers(completedInterviews)
                             .build())
-                    .recentActivities(List.of(
-                            PersonalizedDashboardResponse.ActivityDto.builder().id("act-int-1").type("interview").title("New Interview Assigned").subtitle("Candidate: Rohan Mathur – Technical R1").timeAgo("1 hour ago").iconColor("purple").build(),
-                            PersonalizedDashboardResponse.ActivityDto.builder().id("act-int-2").type("candidate").title("Candidate Profile Ready").subtitle("Java 21, Spring Boot, Kafka, Microservices").timeAgo("2 hours ago").iconColor("green").build(),
-                            PersonalizedDashboardResponse.ActivityDto.builder().id("act-int-3").type("feedback").title("Scorecard Form Ready").subtitle("Complete Technical, Communication & Fit ratings").timeAgo("3 hours ago").iconColor("blue").build()
-                    ))
+                    .recentActivities(activities)
                     .openRequisitions(myInterviews.stream().map(i ->
                             PersonalizedDashboardResponse.RequisitionItemDto.builder()
-                                    .id(i.getRequisition().getRequisitionCode())
-                                    .jobTitle(i.getRequisition().getJobTitle())
-                                    .department(i.getRequisition().getDepartment().getDepartmentName())
+                                    .id(i.getRequisition() != null ? i.getRequisition().getRequisitionCode() : "REQ")
+                                    .jobTitle(i.getRequisition() != null ? i.getRequisition().getJobTitle() : "Job")
+                                    .department(i.getRequisition() != null && i.getRequisition().getDepartment() != null ? i.getRequisition().getDepartment().getDepartmentName() : "General")
                                     .location("Pune")
                                     .status(i.getStatus().name())
                                     .candidateCount(1)
                                     .build()
                     ).distinct().collect(Collectors.toList()))
-                    .upcomingInterviews(upcomingItems)
-                    .tasks(taskItems)
+                    .upcomingInterviews(mapInterviewsToItems(upcomingItems))
+                    .tasks(mapTasksToItems(myTasks))
                     .build();
         }
 
-        // 3. RECRUITER DASHBOARD (e.g. Anita Deshmukh)
+        // 3. RECRUITER DASHBOARD
         if (isRecruiter && !isHRAdmin) {
-            long assignedReqs = requisitionRepository.countByAssignedRecruiterId(currentUser.getId());
-            long assignedCands = candidateRepository.countByRequisitionAssignedRecruiterId(currentUser.getId());
-            long interviewsForMyReqs = interviewRepository.countByRequisitionAssignedRecruiterId(currentUser.getId());
-            long pendingTasks = taskRepository.countByAssignedUserIdAndStatus(currentUser.getId(), RecruitmentTask.TaskStatus.PENDING);
+            Long userId = currentUser != null ? currentUser.getId() : 0L;
+            long assignedReqs = requisitionRepository.countByAssignedRecruiterId(userId);
+            long assignedCands = candidateRepository.countByRequisitionAssignedRecruiterId(userId);
+            long interviewsForMyReqs = interviewRepository.countByRequisitionAssignedRecruiterId(userId);
+            long pendingTasks = taskRepository.countByAssignedUserIdAndStatus(userId, RecruitmentTask.TaskStatus.PENDING);
 
-            List<Requisition> myReqs = requisitionRepository.findByAssignedRecruiterId(currentUser.getId());
-            List<PersonalizedDashboardResponse.RequisitionItemDto> reqItems = myReqs.stream().map(r ->
-                    PersonalizedDashboardResponse.RequisitionItemDto.builder()
-                            .id(r.getRequisitionCode())
-                            .jobTitle(r.getJobTitle())
-                            .department(r.getDepartment().getDepartmentName())
-                            .location("Pune")
-                            .status(r.getStatus().name())
-                            .candidateCount(candidateRepository.findByRequisitionId(r.getId()).size())
-                            .build()
-            ).collect(Collectors.toList());
-
-            List<Interview> myInterviews = interviewRepository.findByRequisitionAssignedRecruiterId(currentUser.getId());
-            List<PersonalizedDashboardResponse.InterviewItemDto> intItems = myInterviews.stream().map(i -> {
-                LocalDateTime dt = i.getScheduledAt();
-                return PersonalizedDashboardResponse.InterviewItemDto.builder()
-                        .id(String.valueOf(i.getId()))
-                        .dateDay(dt != null ? String.valueOf(dt.getDayOfMonth()) : "24")
-                        .dateMonth(dt != null ? dt.getMonth().name().substring(0, 3) : "Oct")
-                        .candidateName(i.getCandidate().getName())
-                        .role(i.getRequisition().getJobTitle())
-                        .time(dt != null ? dt.format(DateTimeFormatter.ofPattern("hh:mm a")) : "02:00 PM")
-                        .mode("Online")
-                        .build();
-            }).collect(Collectors.toList());
-
-            List<RecruitmentTask> myTasks = taskRepository.findByAssignedUserId(currentUser.getId());
-            List<PersonalizedDashboardResponse.TaskItemDto> taskItems = myTasks.stream().map(t ->
-                    PersonalizedDashboardResponse.TaskItemDto.builder()
-                            .id("tsk-" + t.getId())
-                            .title(t.getTaskTitle())
-                            .dueDate(t.getDueDate() != null ? t.getDueDate().toString() : "26 Oct 2026")
-                            .completed(t.getStatus() == RecruitmentTask.TaskStatus.COMPLETED)
-                            .build()
-            ).collect(Collectors.toList());
+            List<Requisition> myReqs = requisitionRepository.findByAssignedRecruiterId(userId);
+            List<Interview> myInterviews = interviewRepository.findByRequisitionAssignedRecruiterId(userId);
+            List<RecruitmentTask> myTasks = taskRepository.findByAssignedUserId(userId);
 
             return PersonalizedDashboardResponse.builder()
                     .user(userDto)
                     .metrics(PersonalizedDashboardResponse.DashboardMetricsDto.builder()
-                            .activeRequisitions(assignedReqs > 0 ? assignedReqs : 2)
-                            .assignedCandidates(assignedCands > 0 ? assignedCands : 6)
-                            .interviewsThisWeek(interviewsForMyReqs > 0 ? interviewsForMyReqs : 2)
-                            .pendingOffers(pendingTasks > 0 ? pendingTasks : 1)
+                            .activeRequisitions(assignedReqs)
+                            .assignedCandidates(assignedCands)
+                            .interviewsThisWeek(interviewsForMyReqs)
+                            .pendingOffers(pendingTasks)
                             .build())
-                    .recentActivities(List.of(
-                            PersonalizedDashboardResponse.ActivityDto.builder().id("act-r1").type("candidate").title("Candidate Rohan Mathur Sourced").subtitle("Assigned to Senior Full Stack Java Engineer").timeAgo("2 hours ago").iconColor("green").build(),
-                            PersonalizedDashboardResponse.ActivityDto.builder().id("act-r2").type("interview").title("Technical Interview Scheduled").subtitle("Interviewer: Arjun Varma (Tech Lead)").timeAgo("3 hours ago").iconColor("purple").build(),
-                            PersonalizedDashboardResponse.ActivityDto.builder().id("act-r3").type("offer").title("Requisition SLA Clock Running").subtitle("REQ-2026-001 (18 days remaining)").timeAgo("1 day ago").iconColor("amber").build()
-                    ))
-                    .openRequisitions(reqItems.isEmpty() ? List.of(
-                            PersonalizedDashboardResponse.RequisitionItemDto.builder().id("REQ-2026-001").jobTitle("Senior Full Stack Java Engineer").department("Engineering & Technology").location("Bangalore / Pune").status("INTERVIEWING").candidateCount(4).build(),
-                            PersonalizedDashboardResponse.RequisitionItemDto.builder().id("REQ-2026-005").jobTitle("Financial Controller").department("Finance & Accounts").location("Mumbai").status("RECRUITER_ASSIGNED").candidateCount(2).build()
-                    ) : reqItems)
-                    .upcomingInterviews(intItems)
-                    .tasks(taskItems.isEmpty() ? List.of(
-                            PersonalizedDashboardResponse.TaskItemDto.builder().id("tsk-rec-1").title("Source 5 Java 21 Candidates – REQ-2026-001").dueDate("26 Oct 2026").completed(false).build(),
-                            PersonalizedDashboardResponse.TaskItemDto.builder().id("tsk-rec-2").title("Screen resumes for Financial Controller").dueDate("27 Oct 2026").completed(false).build()
-                    ) : taskItems)
+                    .recentActivities(activities)
+                    .openRequisitions(mapRequisitionsToItems(myReqs))
+                    .upcomingInterviews(mapInterviewsToItems(myInterviews))
+                    .tasks(mapTasksToItems(myTasks))
                     .build();
         }
 
-        // 4. DEPARTMENT HEAD DASHBOARD (e.g. Sanjay / Rajesh)
+        // 4. DEPARTMENT HEAD DASHBOARD
         if (isDeptHead) {
+            Long deptId = currentUser != null ? currentUser.getDepartmentRestrictionId() : null;
+            long activeReqs = deptId != null ? requisitionRepository.countByDepartmentId(deptId) : 0;
+            long assignedCands = deptId != null ? candidateRepository.countTotal(deptId) : 0;
+            long scheduledInts = deptId != null ? interviewRepository.countByDepartmentIdAndStatus(deptId, Interview.InterviewStatus.SCHEDULED) : 0;
+            long pendingOffers = deptId != null ? candidateRepository.countByStatusAndDept(Candidate.CandidateStatus.OFFER_EXTENDED, deptId) : 0;
+
+            List<Requisition> deptReqs = deptId != null ? requisitionRepository.findByDepartmentId(deptId, PageRequest.of(0, 4)).getContent() : List.of();
+            List<RecruitmentTask> myTasks = currentUser != null ? taskRepository.findByAssignedUserId(currentUser.getId()) : List.of();
+            List<Interview> myAssigned = currentUser != null ? interviewRepository.findByInterviewerId(currentUser.getId()) : List.of();
+
             return PersonalizedDashboardResponse.builder()
                     .user(userDto)
                     .metrics(PersonalizedDashboardResponse.DashboardMetricsDto.builder()
-                            .activeRequisitions(3)
-                            .assignedCandidates(9)
-                            .interviewsThisWeek(3)
-                            .pendingOffers(1)
+                            .activeRequisitions(activeReqs)
+                            .assignedCandidates(assignedCands)
+                            .interviewsThisWeek(scheduledInts)
+                            .pendingOffers(pendingOffers)
                             .build())
-                    .recentActivities(List.of(
-                            PersonalizedDashboardResponse.ActivityDto.builder().id("act-d1").type("candidate").title("New candidate shortlisted").subtitle("Production Engineer – Plant Shirdi").timeAgo("1 hour ago").iconColor("green").build(),
-                            PersonalizedDashboardResponse.ActivityDto.builder().id("act-d2").type("interview").title("Technical interview scheduled").subtitle("Boiler Operator – Round 2").timeAgo("4 hours ago").iconColor("purple").build(),
-                            PersonalizedDashboardResponse.ActivityDto.builder().id("act-d3").type("offer").title("Offer approval pending").subtitle("Feedmill Plant Supervisor – Rahuri").timeAgo("1 day ago").iconColor("amber").build(),
-                            PersonalizedDashboardResponse.ActivityDto.builder().id("act-d4").type("feedback").title("Feedback received").subtitle("Amit Joshi – Plant Operations").timeAgo("2 days ago").iconColor("blue").build()
-                    ))
-                    .openRequisitions(List.of(
-                            PersonalizedDashboardResponse.RequisitionItemDto.builder().id("REQ-2026-004").jobTitle("Production Engineer").department("Plant Operations").location("Plant - Shirdi").status("Open").candidateCount(6).build(),
-                            PersonalizedDashboardResponse.RequisitionItemDto.builder().id("REQ-2026-007").jobTitle("Feedmill Supervisor").department("Feedmill Plant").location("Plant - Rahuri").status("In Progress").candidateCount(5).build(),
-                            PersonalizedDashboardResponse.RequisitionItemDto.builder().id("REQ-2026-009").jobTitle("Boiler Technician").department("Operations & Supply Chain").location("Plant - Shirdi").status("Open").candidateCount(4).build()
-                    ))
-                    .upcomingInterviews(List.of(
-                            PersonalizedDashboardResponse.InterviewItemDto.builder().id("int-d1").dateDay("16").dateMonth("Oct").candidateName("Mahesh Shinde").role("Production Engineer").time("11:00 AM").mode("Onsite").build(),
-                            PersonalizedDashboardResponse.InterviewItemDto.builder().id("int-d2").dateDay("16").dateMonth("Oct").candidateName("Pooja Kale").role("Feedmill Supervisor").time("03:30 PM").mode("Online").build(),
-                            PersonalizedDashboardResponse.InterviewItemDto.builder().id("int-d3").dateDay("17").dateMonth("Oct").candidateName("Ganesh Jadhav").role("Boiler Technician").time("02:00 PM").mode("Onsite").build()
-                    ))
-                    .tasks(List.of(
-                            PersonalizedDashboardResponse.TaskItemDto.builder().id("tsk-d1").title("Approve requisition for Feedmill Supervisor").dueDate("16 Oct 2026").completed(false).build(),
-                            PersonalizedDashboardResponse.TaskItemDto.builder().id("tsk-d2").title("Review candidate shortlist – Production Engineer").dueDate("16 Oct 2026").completed(false).build(),
-                            PersonalizedDashboardResponse.TaskItemDto.builder().id("tsk-d3").title("Conduct final interview – Mahesh Shinde").dueDate("17 Oct 2026").completed(false).build(),
-                            PersonalizedDashboardResponse.TaskItemDto.builder().id("tsk-d4").title("Verify plant manpower budget for Q4").dueDate("18 Oct 2026").completed(false).build()
-                    ))
+                    .recentActivities(activities)
+                    .openRequisitions(mapRequisitionsToItems(deptReqs))
+                    .upcomingInterviews(mapInterviewsToItems(myAssigned))
+                    .tasks(mapTasksToItems(myTasks))
                     .build();
         }
 
-        // 5. DEFAULT HR ADMIN DASHBOARD (e.g. Priyanka Sen)
+        // 5. DEFAULT HR ADMIN DASHBOARD
         long totalCands = candidateRepository.count();
         long activeReqs = requisitionRepository.count();
         long scheduledInts = interviewRepository.countByStatus(Interview.InterviewStatus.SCHEDULED);
         long pendingOffers = candidateRepository.countByStatus(Candidate.CandidateStatus.OFFER_EXTENDED);
 
+        List<Requisition> openReqs = requisitionRepository.findAll(PageRequest.of(0, 4, Sort.by("createdAt").descending())).getContent();
+        List<Interview> upcomingInts = interviewRepository.findAll(PageRequest.of(0, 3, Sort.by("scheduledAt").descending())).getContent();
+        List<RecruitmentTask> myTasks = currentUser != null ? taskRepository.findByAssignedUserId(currentUser.getId()) : List.of();
+
         return PersonalizedDashboardResponse.builder()
                 .user(userDto)
                 .metrics(PersonalizedDashboardResponse.DashboardMetricsDto.builder()
-                        .activeRequisitions(Math.max(activeReqs, 4))
-                        .assignedCandidates(Math.max(totalCands, 12))
-                        .interviewsThisWeek(Math.max(scheduledInts, 5))
-                        .pendingOffers(Math.max(pendingOffers, 2))
+                        .activeRequisitions(activeReqs)
+                        .assignedCandidates(totalCands)
+                        .interviewsThisWeek(scheduledInts)
+                        .pendingOffers(pendingOffers)
                         .build())
-                .recentActivities(List.of(
-                        PersonalizedDashboardResponse.ActivityDto.builder().id("act-1").type("candidate").title("New candidate assigned").subtitle("Software Engineer – Pune").timeAgo("2 hours ago").iconColor("green").build(),
-                        PersonalizedDashboardResponse.ActivityDto.builder().id("act-2").type("interview").title("Interview scheduled").subtitle("Amit Patil – Frontend Developer").timeAgo("5 hours ago").iconColor("purple").build(),
-                        PersonalizedDashboardResponse.ActivityDto.builder().id("act-3").type("feedback").title("Feedback submitted").subtitle("Neha Shah – HR Executive").timeAgo("1 day ago").iconColor("blue").build(),
-                        PersonalizedDashboardResponse.ActivityDto.builder().id("act-4").type("offer").title("Offer letter sent").subtitle("Rohit More – Backend Developer").timeAgo("1 day ago").iconColor("amber").build()
-                ))
-                .openRequisitions(List.of(
-                        PersonalizedDashboardResponse.RequisitionItemDto.builder().id("REQ-2026-001").jobTitle("Assistant Manager").department("Soya Division").location("Plant - Rahuri").status("Open").candidateCount(12).build(),
-                        PersonalizedDashboardResponse.RequisitionItemDto.builder().id("REQ-2026-002").jobTitle("QA Executive").department("Quality Assurance").location("Pune").status("In Progress").candidateCount(8).build(),
-                        PersonalizedDashboardResponse.RequisitionItemDto.builder().id("REQ-2026-003").jobTitle("Production Engineer").department("Plant Operations").location("Plant - Shirdi").status("Open").candidateCount(6).build(),
-                        PersonalizedDashboardResponse.RequisitionItemDto.builder().id("REQ-2026-005").jobTitle("HR Executive").department("Human Resources").location("Pune").status("On Hold").candidateCount(4).build()
-                ))
-                .upcomingInterviews(List.of(
-                        PersonalizedDashboardResponse.InterviewItemDto.builder().id("int-1").dateDay("16").dateMonth("Oct").candidateName("Amit Shah").role("Software Engineer").time("10:00 AM").mode("Online").build(),
-                        PersonalizedDashboardResponse.InterviewItemDto.builder().id("int-2").dateDay("16").dateMonth("Oct").candidateName("Neha Joshi").role("HR Executive").time("02:00 PM").mode("Onsite").build(),
-                        PersonalizedDashboardResponse.InterviewItemDto.builder().id("int-3").dateDay("17").dateMonth("Oct").candidateName("Rahul Patil").role("Quality Analyst").time("11:30 AM").mode("Online").build()
-                ))
-                .tasks(List.of(
-                        PersonalizedDashboardResponse.TaskItemDto.builder().id("tsk-1").title("Review candidate profile – Sohan Desai").dueDate("16 Oct 2026").completed(false).build(),
-                        PersonalizedDashboardResponse.TaskItemDto.builder().id("tsk-2").title("Share interview feedback – Neha Shah").dueDate("16 Oct 2026").completed(false).build(),
-                        PersonalizedDashboardResponse.TaskItemDto.builder().id("tsk-3").title("Shortlist candidates – QA Executive").dueDate("17 Oct 2026").completed(false).build(),
-                        PersonalizedDashboardResponse.TaskItemDto.builder().id("tsk-4").title("Prepare offer letter – Rohit More").dueDate("17 Oct 2026").completed(false).build()
-                ))
+                .recentActivities(activities)
+                .openRequisitions(mapRequisitionsToItems(openReqs))
+                .upcomingInterviews(mapInterviewsToItems(upcomingInts))
+                .tasks(mapTasksToItems(myTasks))
                 .build();
     }
 

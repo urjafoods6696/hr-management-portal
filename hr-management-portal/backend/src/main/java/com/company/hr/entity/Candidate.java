@@ -38,9 +38,8 @@ public class Candidate {
     @Column(nullable = false, length = 30)
     private String mobile;
 
-    @Column(name = "experience_years", nullable = false, precision = 4, scale = 1)
-    @Builder.Default
-    private BigDecimal experienceYears = BigDecimal.ZERO;
+    @Column(name = "experience_years", precision = 4, scale = 1)
+    private BigDecimal experienceYears;
 
     @Column(name = "current_employer", length = 150)
     private String currentEmployer;
@@ -55,16 +54,32 @@ public class Candidate {
     private BigDecimal expectedCtc;
 
     @Column(name = "notice_period_days")
-    @Builder.Default
-    private Integer noticePeriodDays = 30;
+    private Integer noticePeriodDays;
 
     @Column(name = "primary_skills", columnDefinition = "TEXT")
     private String primarySkills;
 
+    @Column(name = "linkedin_url", length = 300)
+    private String linkedinUrl;
+
+    @Column(name = "professional_summary", columnDefinition = "TEXT")
+    private String professionalSummary;
+
+    @Column(name = "work_experience", columnDefinition = "TEXT")
+    private String workExperience;
+
+    @Column(name = "education_details", columnDefinition = "TEXT")
+    private String educationDetails;
+
+    @Column(name = "certifications", columnDefinition = "TEXT")
+    private String certifications;
+
+    @Column(name = "hr_notes", columnDefinition = "TEXT")
+    private String hrNotes;
+
     @Enumerated(EnumType.STRING)
     @Column(length = 30)
-    @Builder.Default
-    private CandidateSource source = CandidateSource.LINKEDIN;
+    private CandidateSource source;
 
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "createdBy", "assignedRecruiter", "replacementForEmployee"})
     @ManyToOne(fetch = FetchType.LAZY)
@@ -72,10 +87,28 @@ public class Candidate {
     @NotFound(action = NotFoundAction.IGNORE)
     private Requisition requisition;
 
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @Column(name = "department_name", length = 150)
+    private String storedDepartment;
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @Column(name = "location", length = 150)
+    private String storedLocation;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 35)
     @Builder.Default
     private CandidateStatus status = CandidateStatus.APPLIED;
+
+    @Column(name = "is_verified", nullable = false)
+    @Builder.Default
+    private Boolean isVerified = false;
+
+    @Column(name = "verified_by", length = 150)
+    private String verifiedBy;
+
+    @Column(name = "verified_at")
+    private LocalDateTime verifiedAt;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
@@ -86,29 +119,44 @@ public class Candidate {
     private LocalDateTime updatedAt;
 
     @Transient
+    @JsonProperty("requisitionId")
+    public Long getAssignedRequisitionId() {
+        try { return requisition != null ? requisition.getId() : null; } catch (Exception e) { return null; }
+    }
+
+    @Transient
     @JsonProperty("jobTitle")
     public String getJobTitle() {
-        try { return (requisition != null && requisition.getJobTitle() != null) ? requisition.getJobTitle() : (currentDesignation != null ? currentDesignation : "Specialist"); } catch (Exception e) { return currentDesignation != null ? currentDesignation : "Specialist"; }
+        try {
+            if (requisition != null && requisition.getJobTitle() != null && !requisition.getJobTitle().isBlank()) {
+                return requisition.getJobTitle();
+            }
+        } catch (Exception ignored) {
+        }
+        return (currentDesignation != null && !currentDesignation.isBlank()) ? currentDesignation : null;
     }
 
     @Transient
     @JsonProperty("departmentName")
     public String getDepartmentName() {
-        try { return (requisition != null && requisition.getDepartment() != null) ? requisition.getDepartment().getDepartmentName() : "General"; } catch (Exception e) { return "General"; }
+        if (storedDepartment != null && !storedDepartment.isBlank()) {
+            return storedDepartment;
+        }
+        try {
+            if (requisition != null && requisition.getDepartment() != null
+                    && requisition.getDepartment().getDepartmentName() != null
+                    && !requisition.getDepartment().getDepartmentName().isBlank()) {
+                return requisition.getDepartment().getDepartmentName();
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
     }
 
     @Transient
     @JsonProperty("location")
     public String getLocation() {
-        if (name != null) {
-            String lower = name.toLowerCase();
-            if (lower.contains("sneha")) return "Shirdi";
-            if (lower.contains("neha") || lower.contains("riya")) return "Mumbai";
-            if (lower.contains("vikram")) return "Rahuri";
-            if (lower.contains("soham")) return "Plant - Shirdi";
-            if (lower.contains("amit") || lower.contains("rahul") || lower.contains("pooja")) return "Pune";
-        }
-        return "Pune";
+        return (storedLocation != null && !storedLocation.isBlank()) ? storedLocation : null;
     }
 
     @Transient
@@ -117,7 +165,7 @@ public class Candidate {
         if (createdAt != null) {
             return createdAt.format(java.time.format.DateTimeFormatter.ofPattern("dd MMM yyyy"));
         }
-        return "12 Oct 2026";
+        return "";
     }
 
     @Transient
@@ -152,18 +200,7 @@ public class Candidate {
     @Transient
     @JsonProperty("avatar")
     public String getAvatar() {
-        if (name != null) {
-            String lower = name.toLowerCase();
-            if (lower.contains("amit")) return "/assets/images/cand_amit.jpg";
-            if (lower.contains("neha")) return "/assets/images/cand_neha.jpg";
-            if (lower.contains("rahul")) return "/assets/images/cand_rahul.jpg";
-            if (lower.contains("sneha")) return "/assets/images/cand_sneha.jpg";
-            if (lower.contains("vikram")) return "/assets/images/cand_vikram.jpg";
-            if (lower.contains("pooja")) return "/assets/images/cand_pooja.jpg";
-            if (lower.contains("soham")) return "/assets/images/cand_soham.jpg";
-            if (lower.contains("riya")) return "/assets/images/cand_riya.jpg";
-        }
-        return "/assets/images/man.jpg";
+        return null;
     }
 
     public enum CandidateSource {

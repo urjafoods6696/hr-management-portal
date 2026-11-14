@@ -15,6 +15,8 @@ public class UserResponseDto {
     private String username;
     private String name;
     private String email;
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private String password;
     private String role;
     private List<String> roles;
     private Long departmentId;

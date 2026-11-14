@@ -3,9 +3,11 @@ package com.company.hr.controller;
 import com.company.hr.dto.ApiResponse;
 import com.company.hr.dto.AuthRequest;
 import com.company.hr.dto.AuthResponse;
+import com.company.hr.dto.PasswordResetResponseDto;
 import com.company.hr.dto.UserResponseDto;
 import com.company.hr.security.JwtTokenProvider;
 import com.company.hr.security.UserPrincipal;
+import com.company.hr.service.PasswordResetService;
 import com.company.hr.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -26,12 +28,13 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
-@Tag(name = "Authentication", description = "Endpoints for user login, token issuance, and profile check")
+@Tag(name = "Authentication", description = "Endpoints for user login, password recovery, token issuance, and profile check")
 public class AuthController {
 
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider tokenProvider;
     private final UserService userService;
+    private final PasswordResetService passwordResetService;
 
     @PostMapping("/login")
     @Operation(summary = "Authenticate user and issue JWT bearer token")
@@ -63,11 +66,34 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.ok(authResponse, "Authentication successful"));
     }
 
+    @PostMapping("/forgot-password")
+    @Operation(summary = "Initiate password recovery and dispatch reset verification code/email")
+    public ResponseEntity<ApiResponse<PasswordResetResponseDto>> forgotPassword(@Valid @RequestBody AuthRequest.ForgotPasswordDto request) {
+        PasswordResetResponseDto response = passwordResetService.initiatePasswordReset(request);
+        return ResponseEntity.ok(ApiResponse.ok(response, response.getMessage()));
+    }
+
+    @PostMapping("/reset-password")
+    @Operation(summary = "Verify token or OTP code and reset user password")
+    public ResponseEntity<ApiResponse<PasswordResetResponseDto>> resetPassword(@Valid @RequestBody AuthRequest.ConfirmResetPasswordDto request) {
+        PasswordResetResponseDto response = passwordResetService.confirmPasswordReset(request);
+        return ResponseEntity.ok(ApiResponse.ok(response, response.getMessage()));
+    }
+
     @GetMapping("/me")
     @Operation(summary = "Get current authenticated user identity and database profile")
     public ResponseEntity<ApiResponse<UserResponseDto>> getCurrentUser(@AuthenticationPrincipal UserPrincipal currentUser) {
         UserResponseDto profile = userService.getCurrentUserProfile(currentUser);
         return ResponseEntity.ok(ApiResponse.ok(profile));
+    }
+
+    @PutMapping("/me")
+    @Operation(summary = "Update current authenticated user's own profile")
+    public ResponseEntity<ApiResponse<UserResponseDto>> updateCurrentUser(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @jakarta.validation.Valid @RequestBody com.company.hr.dto.UserProfileUpdateRequest request) {
+        UserResponseDto profile = userService.updateCurrentUserProfile(currentUser, request);
+        return ResponseEntity.ok(ApiResponse.ok(profile, "Profile updated successfully."));
     }
 
     @PostMapping("/logout")

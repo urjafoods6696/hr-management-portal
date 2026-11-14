@@ -33,14 +33,31 @@ public class InterviewScheduleRequest {
     private String meetingLink;
     private String meetingLocation;
     private String instructions;
+    private String evaluationCriteria;
+
+    public void setEvaluationCriteria(Object criteria) {
+        if (criteria == null) {
+            this.evaluationCriteria = null;
+        } else if (criteria instanceof java.util.Collection) {
+            this.evaluationCriteria = ((java.util.Collection<?>) criteria).stream()
+                    .map(Object::toString)
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .collect(java.util.stream.Collectors.joining(", "));
+        } else {
+            this.evaluationCriteria = criteria.toString().trim();
+        }
+    }
 
     public Interview.InterviewRound getRound() {
-        if (this.round != null) return this.round;
+        if (this.round != null)
+            return this.round;
         return Interview.InterviewRound.TECHNICAL_R1;
     }
 
     public void setRoundName(String name) {
-        if (name == null) return;
+        if (name == null)
+            return;
         String upper = name.toUpperCase();
         if (upper.contains("ROUND 2") || upper.contains("TECHNICAL_R2") || upper.contains("ROUND_2")) {
             this.round = Interview.InterviewRound.TECHNICAL_R2;
@@ -56,15 +73,18 @@ public class InterviewScheduleRequest {
     }
 
     public LocalDateTime getScheduledAt() {
-        if (this.scheduledAt != null) return this.scheduledAt;
+        if (this.scheduledAt != null)
+            return this.scheduledAt;
         return LocalDateTime.now().plusDays(1).withHour(11).withMinute(0);
     }
 
     public void setScheduledTime(String timeStr) {
-        if (timeStr == null || timeStr.isBlank()) return;
+        if (timeStr == null || timeStr.isBlank())
+            return;
         try {
             this.scheduledAt = LocalDateTime.parse(timeStr.length() == 16 ? timeStr + ":00" : timeStr);
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
     }
 
     public void setLocationOrLink(String link) {

@@ -129,24 +129,20 @@ html, body {
   width: 67%;
   height: 52%;
   z-index: 2;
-  border-top: 3px solid var(--urja-lime);
 }
 
 .cell-silos img {
   object-position: center 20%;
 }
 
-/* Fluffy Baby Chick (Middle Center Diagonal Wedge with Lime Glowing Border) */
+/* Fluffy Baby Chick (Middle Center Diagonal Wedge) */
 .cell-chick {
   top: 31%;
   left: 35.5%;
   width: 27%;
   height: 45%;
   z-index: 4;
-  border: 3.5px solid var(--urja-lime);
-  border-radius: 14px;
   clip-path: polygon(0 0, 100% 14%, 84% 100%, 0% 100%);
-  box-shadow: 0 0 25px rgba(132, 214, 35, 0.5), inset 0 0 15px rgba(132, 214, 35, 0.2);
 }
 
 .cell-chick img {
@@ -590,8 +586,10 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: clamp(0.72rem, 1.1vh, 0.76rem);
+  width: 100%;
+  font-size: clamp(0.72rem, 1.1vh, 0.78rem);
   margin-top: -0.1rem;
+  margin-bottom: 0.1rem;
 }
 
 .urja-checkbox-label {
@@ -636,20 +634,43 @@ html, body {
   font-weight: 500;
 }
 
+/* Redesigned Sleek, Borderless Forgot Password Link */
 .forgot-link-btn {
-  background: none;
-  border: none;
-  color: var(--urja-lime-dark);
+  background: transparent !important;
+  background-color: transparent !important;
+  border: 0 !important;
+  border-style: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  color: #16a34a !important;
   font-weight: 600;
-  font-size: clamp(0.72rem, 1.1vh, 0.76rem);
+  font-size: clamp(0.74rem, 1.15vh, 0.8rem);
   cursor: pointer;
-  padding: 0;
-  transition: color 0.2s;
+  padding: 3px 6px !important;
+  margin: 0;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1.2;
 }
 
 .forgot-link-btn:hover {
-  color: #15803d;
-  text-decoration: underline;
+  color: #15803d !important;
+  background-color: rgba(22, 163, 74, 0.08) !important;
+  text-decoration: underline !important;
+}
+
+.forgot-link-btn:focus,
+.forgot-link-btn:focus-visible,
+.forgot-link-btn:active {
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  background-color: rgba(22, 163, 74, 0.12) !important;
 }
 
 /* Vibrant Green Sign In Button */
@@ -1145,3 +1166,82 @@ html, body {
     font-size: 0.92rem;
   }
 }
+
+/* ==============================================================================
+   9. FORGOT & RESET PASSWORD MODAL HELPER STYLES
+   ============================================================================== */
+.urja-modal-alert-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  padding: 0.6rem 0.8rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  margin-bottom: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.urja-modal-alert-info {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  margin-bottom: 0.85rem;
+  line-height: 1.45;
+}
+
+.urja-modal-alert-warning {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  margin-bottom: 0.85rem;
+  line-height: 1.45;
+}
+
+.urja-otp-display-box {
+  background: #f8fafc;
+  border: 1px dashed #16a34a;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.urja-otp-code-text {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: 5px;
+  color: #15803d;
+}
+
+.urja-password-field-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.urja-password-field-wrap .urja-clean-input {
+  padding-right: 38px;
+}
+
+.urja-password-toggle-btn {
+  position: absolute;
+  right: 10px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+}
+

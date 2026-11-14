@@ -1,15 +1,30 @@
 import React, { useState } from 'react';
 
 export default function InterviewFeedbackModal({ candidate, interview, onClose, onSubmit }) {
-  const c = candidate || { name: 'Amit Shah', role: 'Assistant Manager', avatar: '/assets/images/man.jpg' };
-  const inv = interview || { round: 'Technical Round 2', date: '21 Oct 2026', time: '11:00 AM', interviewer: 'Rohan Verma' };
+  const c = candidate || { name: 'Candidate', role: '', avatar: null };
+  const inv = interview || { round: 'Interview Round', date: '', time: '', interviewer: '' };
 
-  const [technical, setTechnical] = useState(4);
-  const [communication, setCommunication] = useState(4);
+  const criteriaList = (() => {
+    if (!inv) return [];
+    if (Array.isArray(inv.evaluationCriteria)) return inv.evaluationCriteria;
+    if (typeof inv.evaluationCriteria === 'string' && inv.evaluationCriteria.trim()) {
+      return inv.evaluationCriteria.split(',').map(s => s.trim()).filter(Boolean);
+    }
+    if (typeof inv.instructions === 'string' && inv.instructions.includes('Criteria:')) {
+      const parts = inv.instructions.split('Criteria:');
+      if (parts.length > 1) {
+        return parts[1].split(',').map(s => s.trim()).filter(Boolean);
+      }
+    }
+    return [];
+  })();
+
+  const [technical, setTechnical] = useState(3);
+  const [communication, setCommunication] = useState(3);
   const [problemSolving, setProblemSolving] = useState(3);
-  const [culturalFit, setCulturalFit] = useState(5);
-  const [recommendation, setRecommendation] = useState('Hire');
-  const [comments, setComments] = useState('Shows good technical knowledge and problem solving skills.');
+  const [culturalFit, setCulturalFit] = useState(3);
+  const [recommendation, setRecommendation] = useState('Hold');
+  const [comments, setComments] = useState('');
 
   // Calculate overall average
   const overallRating = Math.round((technical + communication + problemSolving + culturalFit) / 4);
@@ -79,6 +94,28 @@ export default function InterviewFeedbackModal({ candidate, interview, onClose, 
                 <div className="text-dark fw-medium">Interviewer: {inv.interviewer}</div>
               </div>
             </div>
+
+            {/* Configured Criteria for Evaluation */}
+            {criteriaList.length > 0 && (
+              <div className="mb-4 p-3 bg-light rounded-3 border">
+                <div className="d-flex align-items-center justify-content-between mb-2">
+                  <small className="fw-bold text-dark" style={{ fontSize: '0.74rem' }}>
+                    <i className="bi bi-bullseye text-success me-1"></i>
+                    Evaluation Focus Areas & Criteria:
+                  </small>
+                  <span className="badge bg-success-subtle text-success border border-success" style={{ fontSize: '0.65rem' }}>
+                    {criteriaList.length} criteria
+                  </span>
+                </div>
+                <div className="d-flex flex-wrap gap-1">
+                  {criteriaList.map((crit) => (
+                    <span key={crit} className="badge bg-success-subtle text-success border border-success" style={{ fontSize: '0.74rem', padding: '0.3rem 0.55rem' }}>
+                      <i className="bi bi-check2 me-1"></i>{crit}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Interactive Rating Rows */}
             <div className="mb-4">

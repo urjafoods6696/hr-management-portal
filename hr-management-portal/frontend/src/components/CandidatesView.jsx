@@ -1,5 +1,99 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import '../styles/urja-candidates.css';
+import { getStoredToken } from '../services/api';
+
+const STAGE_TO_BACKEND_STATUS = {
+  new: 'APPLIED',
+  applied: 'APPLIED',
+  'in progress': 'SCREENING',
+  'in screening': 'SCREENING',
+  screening: 'SCREENING',
+  interview: 'INTERVIEW_SCHEDULED',
+  'in interview': 'INTERVIEW_SCHEDULED',
+  offer: 'OFFER_EXTENDED',
+  'offer stage': 'OFFER_EXTENDED',
+  rejected: 'REJECTED'
+};
+
+function toBackendStatus(displayStatus) {
+  if (!displayStatus) return 'APPLIED';
+  const key = displayStatus.toString().trim().toLowerCase();
+  return STAGE_TO_BACKEND_STATUS[key] || displayStatus.toString().trim().toUpperCase().replace(/\s+/g, '_');
+}
+
+function toBackendSource(src) {
+  if (!src || !src.toString().trim()) return null;
+  const s = src.toString().trim().toUpperCase().replace(/\s+/g, '_');
+  if (s.includes('WEBSITE') || s.includes('CAREERS') || s.includes('PORTAL')) return 'COMPANY_CAREERS';
+  if (s.includes('NAUKRI')) return 'NAUKRI';
+  if (s.includes('LINKEDIN')) return 'LINKEDIN';
+  if (s.includes('REFERRAL')) return 'REFERRAL';
+  if (s.includes('CAMPUS')) return 'CAMPUS';
+  if (s.includes('HEADHUNTER')) return 'HEADHUNTER';
+  return null;
+}
+
+function mapStatusToDisplay(status) {
+  switch ((status || '').toUpperCase()) {
+    case 'SCREENING':
+    case 'SHORTLISTED':
+      return 'In Progress';
+    case 'INTERVIEW_SCHEDULED':
+    case 'INTERVIEW_IN_PROGRESS':
+      return 'Interview';
+    case 'OFFER_EXTENDED':
+    case 'OFFER_ACCEPTED':
+      return 'Offer';
+    case 'REJECTED':
+    case 'WITHDRAWN':
+      return 'Rejected';
+    case 'JOINED':
+      return 'Joined';
+    default:
+      return 'New';
+  }
+}
+
+function mapStatusToStage(status) {
+  switch ((status || '').toUpperCase()) {
+    case 'SCREENING':
+    case 'SHORTLISTED':
+      return 'Screening';
+    case 'INTERVIEW_SCHEDULED':
+    case 'INTERVIEW_IN_PROGRESS':
+      return 'Technical Round';
+    case 'OFFER_EXTENDED':
+    case 'OFFER_ACCEPTED':
+      return 'Offer Released';
+    case 'REJECTED':
+    case 'WITHDRAWN':
+      return 'Not Selected';
+    case 'JOINED':
+      return 'Joined';
+    default:
+      return 'Application Received';
+  }
+}
+
+function formatAppliedDate(c) {
+  if (c.appliedDate) return c.appliedDate;
+  if (c.createdAt) {
+    const parsed = new Date(c.createdAt);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+  }
+  return 'Just Now';
+}
+
+function extractApiError(body, fallback) {
+  if (!body) return fallback;
+  if (body.data && typeof body.data === 'object' && !Array.isArray(body.data)) {
+    const fieldMessages = Object.values(body.data).filter(Boolean);
+    if (fieldMessages.length > 0) return fieldMessages.join(' ');
+  }
+  return body.message || fallback;
+}
 
 export default function CandidatesView({
   currentUser,
@@ -13,13 +107,13 @@ export default function CandidatesView({
   const [candidates, setCandidates] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [stats, setStats] = useState({
-    totalCandidates: 248,
-    newApplications: 32,
-    newThisWeek: 12,
-    inScreening: 65,
-    inInterview: 48,
-    offerStage: 18,
-    rejected: 85
+    totalCandidates: 0,
+    newApplications: 0,
+    newThisWeek: 0,
+    inScreening: 0,
+    inInterview: 0,
+    offerStage: 0,
+    rejected: 0
   });
 
   // 2. Filter States (Matching Row 1 & Row 2 of reference mockup)
@@ -50,269 +144,148 @@ export default function CandidatesView({
   const [candidateToDelete, setCandidateToDelete] = useState(null);
   const [stageChangeCandidate, setStageChangeCandidate] = useState(null);
 
-  // Form State for Add / Edit
+  // Form State for Add / Edit (zero invented defaults — only user-provided or HR-entered values)
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     mobile: '',
     requisitionId: '',
-    jobTitle: 'Software Engineer',
-    department: 'Soya Division',
-    location: 'Pune',
-    experienceYears: 3,
-    source: 'NAUKRI',
-    currentCtc: 800000,
-    expectedCtc: 1200000,
-    noticePeriodDays: 30,
+    jobTitle: '',
+    department: '',
+    location: '',
+    experienceYears: '',
+    source: '',
+    currentEmployer: '',
+    currentCtc: '',
+    expectedCtc: '',
+    noticePeriodDays: '',
     primarySkills: '',
+    linkedinUrl: '',
+    professionalSummary: '',
+    workExperience: '',
+    educationDetails: '',
+    certifications: '',
     resumeFile: null
   });
   const [formErrors, setFormErrors] = useState({});
+  const [apiError, setApiError] = useState('');
+  const [fetchError, setFetchError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 5. Fetch Summary Stats from Backend
-  useEffect(() => {
-    const token = sessionStorage.getItem('ats_urja_token') || currentUser?.token;
-    if (!token) return;
-
-    fetch('http://localhost:8080/api/v1/candidates/stats', {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-      .then(res => (res.ok ? res.json() : null))
-      .then(body => {
-        if (body && body.data) {
-          setStats(body.data);
-        }
-      })
-      .catch(err => console.warn('Could not fetch candidate stats:', err));
+  const getAuthToken = useCallback(() => {
+    return getStoredToken() || currentUser?.token || null;
   }, [currentUser]);
 
-  // 6. Fetch Candidates from Backend with Fallback
-  const fetchCandidatesFromBackend = () => {
-    setIsLoading(true);
-    const token = sessionStorage.getItem('ats_urja_token') || currentUser?.token;
-    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  // 5. Fetch Summary Stats from Backend
+  const fetchCandidateStats = useCallback(async () => {
+    const token = getAuthToken();
+    if (!token) return;
 
-    let url = `http://localhost:8080/api/v1/candidates?page=0&size=50`;
+    try {
+      const res = await fetch('http://localhost:8080/api/v1/candidates/stats', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) return;
+      const body = await res.json();
+      if (body && body.data) {
+        setStats(body.data);
+      }
+    } catch (err) {
+      console.warn('Could not fetch candidate stats:', err);
+    }
+  }, [getAuthToken]);
+
+  useEffect(() => {
+    fetchCandidateStats();
+  }, [fetchCandidateStats]);
+
+  // 6. Fetch Candidates from Backend (Single Source of Truth: MySQL)
+  const fetchCandidatesFromBackend = useCallback(async () => {
+    const token = getAuthToken();
+    if (!token) {
+      setCandidates([]);
+      setFetchError('Authentication session missing. Please sign in again.');
+      return;
+    }
+
+    setIsLoading(true);
+    setFetchError('');
+
+    let url = 'http://localhost:8080/api/v1/candidates?page=0&size=200';
     if (appliedSearch) url += `&search=${encodeURIComponent(appliedSearch)}`;
-    if (filterReq !== 'ALL') url += `&requisitionId=${filterReq}`;
+    if (filterReq !== 'ALL' && /^\d+$/.test(String(filterReq))) {
+      url += `&requisitionId=${filterReq}`;
+    }
     if (filterDept !== 'ALL') url += `&department=${encodeURIComponent(filterDept)}`;
     if (filterStatus !== 'ALL') url += `&status=${encodeURIComponent(filterStatus)}`;
-    if (filterSource !== 'ALL') url += `&source=${encodeURIComponent(filterSource)}`;
+    const backendSourceFilter = filterSource !== 'ALL' ? toBackendSource(filterSource) : null;
+    if (backendSourceFilter) url += `&source=${encodeURIComponent(backendSourceFilter)}`;
 
-    fetch(url, { headers })
-      .then(res => (res.ok ? res.json() : Promise.reject('Failed to fetch candidates')))
-      .then(body => {
-        setIsLoading(false);
-        if (body && body.data && Array.isArray(body.data.content)) {
-          if (body.data.content.length > 0) {
-            // Normalize backend candidates with UI attributes
-            const mapped = body.data.content.map(c => ({
-              id: c.id,
-              code: c.candidateCode,
-              name: c.name,
-              email: c.email,
-              mobile: c.mobile,
-              jobTitle: c.jobTitle || 'Software Engineer',
-              department: c.departmentName || 'General',
-              location: c.location || 'Pune',
-              appliedDate: c.appliedDate || '12 Oct 2026',
-              rawDate: c.createdAt,
-              source: formatSource(c.source),
-              status: c.displayStatus || 'New',
-              currentStage: c.currentStage || 'Application Received',
-              avatar: c.avatar || (c.name && c.name.toLowerCase().includes('neha') ? '/assets/images/cand_neha.jpg' : '/assets/images/cand_amit.jpg'),
-              expYears: c.experienceYears || 3,
-              noticeDays: c.noticePeriodDays || 30,
-              skills: c.primarySkills || '',
-              expectedCtc: c.expectedCtc || 1000000
-            }));
-            setCandidates(mapped);
-          } else {
-            // Zero candidates returned by backend (e.g. IT Admin restricted by policy, or interviewer with no assigned candidates)
-            setCandidates([]);
-          }
-        } else {
-          if (currentUser?.role === 'ROLE_IT_ADMIN') {
-            setCandidates([]);
-          } else {
-            setCandidates(getDefaultCandidates());
-          }
-        }
-      })
-      .catch(() => {
-        setIsLoading(false);
-        if (currentUser?.role === 'ROLE_IT_ADMIN') {
-          setCandidates([]);
-        } else {
-          setCandidates(getDefaultCandidates());
-        }
+    try {
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` }
       });
-  };
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(extractApiError(body, `Failed to load candidates (${res.status})`));
+      }
+
+      if (body && body.data && Array.isArray(body.data.content)) {
+        const mapped = body.data.content.map(c => ({
+          id: c.id,
+          code: c.candidateCode,
+          name: c.name,
+          email: c.email,
+          mobile: c.mobile,
+          requisitionId: c.requisitionId ?? c.requisition?.id ?? null,
+          jobTitle: c.jobTitle ?? c.currentDesignation ?? null,
+          department: c.departmentName ?? null,
+          location: c.location ?? null,
+          appliedDate: formatAppliedDate(c),
+          rawDate: c.createdAt,
+          source: formatSource(c.source),
+          rawStatus: c.status,
+          status: c.displayStatus || mapStatusToDisplay(c.status),
+          currentStage: c.currentStage || mapStatusToStage(c.status),
+          avatar: c.avatar || null,
+          expYears: c.experienceYears ?? null,
+          currentEmployer: c.currentEmployer ?? null,
+          currentCtc: c.currentCtc ?? null,
+          noticeDays: c.noticePeriodDays ?? null,
+          skills: c.primarySkills ?? '',
+          expectedCtc: c.expectedCtc ?? null,
+          linkedinUrl: c.linkedinUrl ?? '',
+          professionalSummary: c.professionalSummary ?? '',
+          workExperience: c.workExperience ?? '',
+          educationDetails: c.educationDetails ?? '',
+          certifications: c.certifications ?? '',
+          hrNotes: c.hrNotes ?? '',
+          isVerified: Boolean(c.isVerified),
+          verifiedBy: c.verifiedBy ?? null,
+          verifiedAt: c.verifiedAt ?? null
+        }));
+        setCandidates(mapped);
+      } else {
+        setCandidates([]);
+      }
+    } catch (err) {
+      setFetchError(err.message || 'Could not load candidates from server.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [getAuthToken, appliedSearch, filterReq, filterDept, filterStatus, filterSource]);
 
   useEffect(() => {
     fetchCandidatesFromBackend();
-  }, [appliedSearch, filterReq, filterDept, filterStatus, filterSource, currentUser]);
+  }, [fetchCandidatesFromBackend]);
 
-  // Default seed list matching reference mockup image media_1792815866975.png
+  // Default seed list (empty for production)
   function getDefaultCandidates() {
-    return [
-      {
-        id: 101,
-        code: 'CAN-2026-M01',
-        name: 'Amit Patil',
-        email: 'amit.patil@gmail.com',
-        mobile: '+91 98221 12345',
-        jobTitle: 'Software Engineer',
-        department: 'Soya Division',
-        location: 'Pune',
-        appliedDate: '12 Oct 2026',
-        source: 'Naukri',
-        status: 'New',
-        currentStage: 'Application Received',
-        avatar: '/assets/images/cand_amit.jpg',
-        expYears: 4,
-        noticeDays: 30,
-        skills: 'React, Node.js, JavaScript, REST APIs, MySQL',
-        expectedCtc: 1250000
-      },
-      {
-        id: 102,
-        code: 'CAN-2026-M02',
-        name: 'Neha Joshi',
-        email: 'neha.joshi@gmail.com',
-        mobile: '+91 98222 23456',
-        jobTitle: 'HR Executive',
-        department: 'Human Resources',
-        location: 'Mumbai',
-        appliedDate: '11 Oct 2026',
-        source: 'LinkedIn',
-        status: 'In Progress',
-        currentStage: 'Screening',
-        avatar: '/assets/images/cand_neha.jpg',
-        expYears: 3.5,
-        noticeDays: 15,
-        skills: 'Talent Acquisition, Campus Hiring, HRMS, Sourcing',
-        expectedCtc: 650000
-      },
-      {
-        id: 103,
-        code: 'CAN-2026-M03',
-        name: 'Rahul More',
-        email: 'rahul.more@gmail.com',
-        mobile: '+91 98223 34567',
-        jobTitle: 'Quality Analyst',
-        department: 'Quality Assurance',
-        location: 'Pune',
-        appliedDate: '10 Oct 2026',
-        source: 'Company Website',
-        status: 'Interview',
-        currentStage: 'Technical Round',
-        avatar: '/assets/images/cand_rahul.jpg',
-        expYears: 4.5,
-        noticeDays: 30,
-        skills: 'Selenium, Java, Manual Testing, JIRA, Test Automation',
-        expectedCtc: 950000
-      },
-      {
-        id: 104,
-        code: 'CAN-2026-M04',
-        name: 'Sneha Shah',
-        email: 'sneha.shah@gmail.com',
-        mobile: '+91 98224 45678',
-        jobTitle: 'Production Engineer',
-        department: 'Plant Operations',
-        location: 'Shirdi',
-        appliedDate: '09 Oct 2026',
-        source: 'Referral',
-        status: 'Offer',
-        currentStage: 'Offer Released',
-        avatar: '/assets/images/cand_sneha.jpg',
-        expYears: 5,
-        noticeDays: 45,
-        skills: 'Plant Operations, PLC SCADA, Six Sigma, Lean Manufacturing',
-        expectedCtc: 1050000
-      },
-      {
-        id: 105,
-        code: 'CAN-2026-M05',
-        name: 'Vikram Desai',
-        email: 'vikram.desai@gmail.com',
-        mobile: '+91 98225 56789',
-        jobTitle: 'Plant Operator',
-        department: 'Operations & Supply Chain',
-        location: 'Rahuri',
-        appliedDate: '08 Oct 2026',
-        source: 'Naukri',
-        status: 'New',
-        currentStage: 'Application Received',
-        avatar: '/assets/images/cand_vikram.jpg',
-        expYears: 2.5,
-        noticeDays: 15,
-        skills: 'Boiler Operation, Steam Systems, Machine Preventive Maintenance',
-        expectedCtc: 480000
-      },
-      {
-        id: 106,
-        code: 'CAN-2026-M06',
-        name: 'Pooja Kale',
-        email: 'pooja.kale@gmail.com',
-        mobile: '+91 98226 67890',
-        jobTitle: 'QA Executive',
-        department: 'Quality Assurance',
-        location: 'Pune',
-        appliedDate: '07 Oct 2026',
-        source: 'LinkedIn',
-        status: 'In Progress',
-        currentStage: 'HR Round',
-        avatar: '/assets/images/cand_pooja.jpg',
-        expYears: 3,
-        noticeDays: 30,
-        skills: 'Food Safety, FSSAI, HACCP, ISO 22000, Lab Testing',
-        expectedCtc: 720000
-      },
-      {
-        id: 107,
-        code: 'CAN-2026-M07',
-        name: 'Soham Gawade',
-        email: 'soham.gawade@gmail.com',
-        mobile: '+91 98227 78901',
-        jobTitle: 'Maintenance Engineer',
-        department: 'Plant Operations',
-        location: 'Plant - Shirdi',
-        appliedDate: '06 Oct 2026',
-        source: 'Referral',
-        status: 'Rejected',
-        currentStage: 'Not Selected',
-        avatar: '/assets/images/cand_soham.jpg',
-        expYears: 4,
-        noticeDays: 30,
-        skills: 'Electrical Maintenance, Gearbox Alignment, HT Panels',
-        expectedCtc: 800000
-      },
-      {
-        id: 108,
-        code: 'CAN-2026-M08',
-        name: 'Riya Patil',
-        email: 'riya.patil@gmail.com',
-        mobile: '+91 98228 89012',
-        jobTitle: 'HR Executive',
-        department: 'Human Resources',
-        location: 'Mumbai',
-        appliedDate: '05 Oct 2026',
-        source: 'Company Website',
-        status: 'Interview',
-        currentStage: 'HR Round',
-        avatar: '/assets/images/cand_riya.jpg',
-        expYears: 3.2,
-        noticeDays: 30,
-        skills: 'HR Operations, Employee Relations, Statutory Compliance',
-        expectedCtc: 680000
-      }
-    ];
+    return [];
   }
 
   function formatSource(src) {
-    if (!src) return 'Naukri';
+    if (!src) return null;
     const s = src.toString().toUpperCase();
     if (s.includes('NAUKRI')) return 'Naukri';
     if (s.includes('LINKEDIN')) return 'LinkedIn';
@@ -324,10 +297,13 @@ export default function CandidatesView({
   }
 
   // 7. Role-Based Permissions & Scoping
-  const userRole = (currentUser?.roles && currentUser.roles[0]) || currentUser?.role || 'ROLE_HR_ADMIN';
+  const userRoles = (currentUser?.roles || []).map(r => typeof r === 'string' ? r : (r.roleName || r.name || ''));
+  if (currentUser?.role) userRoles.push(currentUser.role);
+  const isHRAdmin = userRoles.includes('ROLE_HR_ADMIN');
+  const userRole = userRoles[0] || currentUser?.role || 'ROLE_HR_ADMIN';
   const isDeptHead = userRole === 'ROLE_DEPT_HEAD';
-  const canEdit = ['ROLE_HR_ADMIN', 'ROLE_HR_RECRUITER', 'ROLE_IT_ADMIN'].includes(userRole);
-  const canDelete = ['ROLE_HR_ADMIN', 'ROLE_IT_ADMIN'].includes(userRole);
+  const canEdit = ['ROLE_HR_ADMIN', 'ROLE_HR_RECRUITER', 'ROLE_IT_ADMIN'].some(r => userRoles.includes(r));
+  const canDelete = ['ROLE_HR_ADMIN', 'ROLE_IT_ADMIN'].some(r => userRoles.includes(r));
 
   // Close more-options menus when clicked outside
   useEffect(() => {
@@ -345,38 +321,42 @@ export default function CandidatesView({
     return candidates.filter((c) => {
       // Requisition filter
       if (filterReq !== 'ALL') {
-        const reqMatch = c.jobTitle.toLowerCase().includes(filterReq.toLowerCase()) || (c.code && c.code.includes(filterReq));
+        const isNumericReq = /^\d+$/.test(String(filterReq));
+        const reqMatch = isNumericReq
+          ? String(c.requisitionId || '') === String(filterReq)
+          : ((c.jobTitle || '').toLowerCase().includes(filterReq.toLowerCase()) || (c.code && c.code.includes(filterReq)));
         if (!reqMatch) return false;
       }
 
       // Department filter
       if (filterDept !== 'ALL') {
-        if (c.department.toLowerCase() !== filterDept.toLowerCase()) return false;
+        if ((c.department || '').toLowerCase() !== filterDept.toLowerCase()) return false;
       }
 
       // Status filter
       if (filterStatus !== 'ALL') {
-        if (c.status.toLowerCase() !== filterStatus.toLowerCase()) return false;
+        if ((c.status || '').toLowerCase() !== filterStatus.toLowerCase()) return false;
       }
 
       // Source filter
       if (filterSource !== 'ALL') {
-        if (c.source.toLowerCase() !== filterSource.toLowerCase()) return false;
+        if ((c.source || '').toLowerCase() !== filterSource.toLowerCase()) return false;
       }
 
       // Text Search Query (across name, email, mobile, skills, job title)
       if (appliedSearch && appliedSearch.trim()) {
         const q = appliedSearch.toLowerCase().trim();
-        const inName = c.name.toLowerCase().includes(q);
-        const inEmail = c.email.toLowerCase().includes(q);
+        const inName = (c.name || '').toLowerCase().includes(q);
+        const inEmail = (c.email || '').toLowerCase().includes(q);
         const inMobile = c.mobile && c.mobile.includes(q);
         const inSkills = c.skills && c.skills.toLowerCase().includes(q);
-        const inJob = c.jobTitle.toLowerCase().includes(q);
+        const inJob = (c.jobTitle || '').toLowerCase().includes(q);
         if (!inName && !inEmail && !inMobile && !inSkills && !inJob) return false;
       }
 
       // More filters: Experience
       if (filterExp !== 'ALL') {
+        if (c.expYears == null) return false;
         if (filterExp === '0-2' && (c.expYears < 0 || c.expYears > 2)) return false;
         if (filterExp === '3-5' && (c.expYears < 3 || c.expYears > 5)) return false;
         if (filterExp === '5+' && c.expYears < 5) return false;
@@ -384,6 +364,7 @@ export default function CandidatesView({
 
       // More filters: Notice Period
       if (filterNotice !== 'ALL') {
+        if (c.noticeDays == null) return false;
         if (filterNotice === '15' && c.noticeDays > 15) return false;
         if (filterNotice === '30' && c.noticeDays > 30) return false;
       }
@@ -421,6 +402,12 @@ export default function CandidatesView({
   }, [filteredCandidates, sortField, sortOrder]);
 
   const totalPages = Math.ceil(sortedCandidates.length / rowsPerPage) || 1;
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   const paginatedCandidates = useMemo(() => {
     const startIndex = (currentPage - 1) * rowsPerPage;
     return sortedCandidates.slice(startIndex, startIndex + rowsPerPage);
@@ -490,64 +477,92 @@ export default function CandidatesView({
     return Object.keys(errs).length === 0;
   };
 
-  // 14. Add Candidate Submit Handler
-  const handleAddSubmit = (e) => {
+  // 14. Add Candidate Submit Handler (Persisted to MySQL before updating UI)
+  const handleAddSubmit = async (e) => {
     e.preventDefault();
-    if (!validateForm()) return;
+    if (!validateForm() || isSubmitting) return;
 
-    const newId = candidates.length > 0 ? Math.max(...candidates.map(c => c.id)) + 1 : 109;
-    const newCand = {
-      id: newId,
-      code: `CAN-2026-M${newId}`,
-      name: formData.name.trim(),
-      email: formData.email.trim(),
-      mobile: formData.mobile.trim(),
-      jobTitle: formData.jobTitle || 'Software Engineer',
-      department: formData.department || 'Soya Division',
-      location: formData.location || 'Pune',
-      appliedDate: 'Just Now',
-      source: formatSource(formData.source),
-      status: 'New',
-      currentStage: 'Application Received',
-      avatar: formData.name.toLowerCase().includes('neha') || formData.name.toLowerCase().includes('pooja') 
-              ? '/assets/images/cand_neha.jpg' 
-              : '/assets/images/cand_amit.jpg',
-      expYears: parseFloat(formData.experienceYears) || 3,
-      noticeDays: parseInt(formData.noticePeriodDays) || 30,
-      skills: formData.primarySkills || '',
-      expectedCtc: parseFloat(formData.expectedCtc) || 1200000
-    };
-
-    // Call backend API if connected
-    const token = sessionStorage.getItem('ats_urja_token') || currentUser?.token;
-    if (token) {
-      fetch('http://localhost:8080/api/v1/candidates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          name: newCand.name,
-          email: newCand.email,
-          mobile: newCand.mobile,
-          requisitionId: formData.requisitionId ? parseInt(formData.requisitionId) : 1,
-          experienceYears: newCand.expYears,
-          currentDesignation: newCand.jobTitle,
-          currentCtc: formData.currentCtc,
-          expectedCtc: newCand.expectedCtc,
-          noticePeriodDays: newCand.noticeDays,
-          primarySkills: newCand.skills,
-          source: formData.source
-        })
-      }).catch(err => console.warn('Backend candidate save issue:', err));
+    const token = getAuthToken();
+    if (!token) {
+      setApiError('Authentication required. Please sign in again.');
+      showToast('Authentication required to register candidate.');
+      return;
     }
 
-    setCandidates([newCand, ...candidates]);
-    setStats(prev => ({
-      ...prev,
-      totalCandidates: prev.totalCandidates + 1,
-      newApplications: prev.newApplications + 1
-    }));
-    setShowAddModal(false);
-    showToast(`Candidate ${newCand.name} registered successfully!`);
+    setIsSubmitting(true);
+    setApiError('');
+
+    try {
+      const parsedReqId = formData.requisitionId && /^\d+$/.test(String(formData.requisitionId))
+        ? parseInt(formData.requisitionId, 10)
+        : null;
+
+      const expParsed = formData.experienceYears !== '' && formData.experienceYears != null
+        ? parseFloat(formData.experienceYears)
+        : null;
+      const noticeParsed = formData.noticePeriodDays !== '' && formData.noticePeriodDays != null
+        ? parseInt(formData.noticePeriodDays, 10)
+        : null;
+
+      const payload = {
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        mobile: formData.mobile.trim(),
+        requisitionId: parsedReqId,
+        departmentName: formData.department ? formData.department.trim() : null,
+        location: formData.location ? formData.location.trim() : null,
+        experienceYears: Number.isFinite(expParsed) ? expParsed : null,
+        currentEmployer: formData.currentEmployer ? formData.currentEmployer.trim() : null,
+        currentDesignation: formData.jobTitle ? formData.jobTitle.trim() : null,
+        currentCtc: formData.currentCtc !== '' && formData.currentCtc != null ? parseFloat(formData.currentCtc) : null,
+        expectedCtc: formData.expectedCtc !== '' && formData.expectedCtc != null ? parseFloat(formData.expectedCtc) : null,
+        noticePeriodDays: Number.isFinite(noticeParsed) ? noticeParsed : null,
+        primarySkills: formData.primarySkills ? formData.primarySkills.trim() : null,
+        linkedinUrl: formData.linkedinUrl ? formData.linkedinUrl.trim() : null,
+        professionalSummary: formData.professionalSummary ? formData.professionalSummary.trim() : null,
+        workExperience: formData.workExperience ? formData.workExperience.trim() : null,
+        educationDetails: formData.educationDetails ? formData.educationDetails.trim() : null,
+        certifications: formData.certifications ? formData.certifications.trim() : null,
+        source: toBackendSource(formData.source)
+      };
+
+      const res = await fetch('http://localhost:8080/api/v1/candidates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload)
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(extractApiError(body, `Failed to create candidate (${res.status})`));
+      }
+
+      const savedCandidate = body?.data;
+
+      if (formData.resumeFile && savedCandidate?.id) {
+        const uploadData = new FormData();
+        uploadData.append('file', formData.resumeFile);
+        const resumeRes = await fetch(`http://localhost:8080/api/v1/candidates/${savedCandidate.id}/resume`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: uploadData
+        });
+        if (!resumeRes.ok) {
+          const resumeBody = await resumeRes.json().catch(() => null);
+          showToast(extractApiError(resumeBody, 'Candidate saved, but resume upload failed.'));
+        }
+      }
+
+      setShowAddModal(false);
+      setCurrentPage(1);
+      await Promise.all([fetchCandidatesFromBackend(), fetchCandidateStats()]);
+      showToast(`Candidate ${savedCandidate?.name || payload.name} registered successfully!`);
+    } catch (err) {
+      const msg = err.message || 'Failed to register candidate in database.';
+      setApiError(msg);
+      showToast(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // 15. Edit Candidate Handlers
@@ -557,126 +572,213 @@ export default function CandidatesView({
       name: cand.name,
       email: cand.email,
       mobile: cand.mobile,
-      jobTitle: cand.jobTitle,
-      department: cand.department,
-      location: cand.location,
-      experienceYears: cand.expYears || 3,
-      source: cand.source.toUpperCase().replace(' ', '_'),
-      expectedCtc: cand.expectedCtc || 1000000,
-      noticePeriodDays: cand.noticeDays || 30,
-      primarySkills: cand.skills || ''
+      requisitionId: cand.requisitionId ? String(cand.requisitionId) : '',
+      jobTitle: cand.jobTitle || '',
+      department: cand.department || '',
+      location: cand.location || '',
+      experienceYears: cand.expYears != null ? cand.expYears : '',
+      source: toBackendSource(cand.source) || '',
+      currentEmployer: cand.currentEmployer || '',
+      currentCtc: cand.currentCtc != null ? cand.currentCtc : '',
+      expectedCtc: cand.expectedCtc != null ? cand.expectedCtc : '',
+      noticePeriodDays: cand.noticeDays != null ? cand.noticeDays : '',
+      primarySkills: cand.skills || '',
+      linkedinUrl: cand.linkedinUrl || '',
+      professionalSummary: cand.professionalSummary || '',
+      workExperience: cand.workExperience || '',
+      educationDetails: cand.educationDetails || '',
+      certifications: cand.certifications || '',
+      resumeFile: null
     });
     setFormErrors({});
+    setApiError('');
     setShowEditModal(true);
     setActiveMenuId(null);
   };
 
-  const handleEditSubmit = (e) => {
+  const handleEditSubmit = async (e) => {
     e.preventDefault();
-    if (!validateForm() || !editingCandidate) return;
+    if (!validateForm() || !editingCandidate || isSubmitting) return;
 
-    const updatedList = candidates.map(c => {
-      if (c.id === editingCandidate.id) {
-        return {
-          ...c,
-          name: formData.name.trim(),
-          email: formData.email.trim(),
-          mobile: formData.mobile.trim(),
-          jobTitle: formData.jobTitle,
-          department: formData.department,
-          location: formData.location,
-          expYears: parseFloat(formData.experienceYears) || c.expYears,
-          noticeDays: parseInt(formData.noticePeriodDays) || c.noticeDays,
-          skills: formData.primarySkills || c.skills,
-          expectedCtc: parseFloat(formData.expectedCtc) || c.expectedCtc
-        };
-      }
-      return c;
-    });
+    const token = getAuthToken();
+    if (!token) {
+      setApiError('Authentication required. Please sign in again.');
+      return;
+    }
 
-    // Call backend API update
-    const token = sessionStorage.getItem('ats_urja_token') || currentUser?.token;
-    if (token) {
-      fetch(`http://localhost:8080/api/v1/candidates/${editingCandidate.id}`, {
+    setIsSubmitting(true);
+    setApiError('');
+
+    try {
+      const parsedReqId = formData.requisitionId && /^\d+$/.test(String(formData.requisitionId))
+        ? parseInt(formData.requisitionId, 10)
+        : null;
+      const expParsed = formData.experienceYears !== '' && formData.experienceYears != null
+        ? parseFloat(formData.experienceYears)
+        : null;
+      const noticeParsed = formData.noticePeriodDays !== '' && formData.noticePeriodDays != null
+        ? parseInt(formData.noticePeriodDays, 10)
+        : null;
+
+      const res = await fetch(`http://localhost:8080/api/v1/candidates/${editingCandidate.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           name: formData.name.trim(),
           email: formData.email.trim(),
           mobile: formData.mobile.trim(),
-          requisitionId: 1,
-          experienceYears: parseFloat(formData.experienceYears) || 3,
-          currentDesignation: formData.jobTitle,
-          expectedCtc: parseFloat(formData.expectedCtc) || 1000000,
-          noticePeriodDays: parseInt(formData.noticePeriodDays) || 30,
-          primarySkills: formData.primarySkills || '',
-          source: formData.source
+          requisitionId: parsedReqId,
+          departmentName: formData.department ? formData.department.trim() : null,
+          location: formData.location ? formData.location.trim() : null,
+          experienceYears: Number.isFinite(expParsed) ? expParsed : null,
+          currentEmployer: formData.currentEmployer ? formData.currentEmployer.trim() : null,
+          currentDesignation: formData.jobTitle ? formData.jobTitle.trim() : null,
+          currentCtc: formData.currentCtc !== '' && formData.currentCtc != null ? parseFloat(formData.currentCtc) : null,
+          expectedCtc: formData.expectedCtc !== '' && formData.expectedCtc != null ? parseFloat(formData.expectedCtc) : null,
+          noticePeriodDays: Number.isFinite(noticeParsed) ? noticeParsed : null,
+          primarySkills: formData.primarySkills ? formData.primarySkills.trim() : null,
+          linkedinUrl: formData.linkedinUrl ? formData.linkedinUrl.trim() : null,
+          professionalSummary: formData.professionalSummary ? formData.professionalSummary.trim() : null,
+          workExperience: formData.workExperience ? formData.workExperience.trim() : null,
+          educationDetails: formData.educationDetails ? formData.educationDetails.trim() : null,
+          certifications: formData.certifications ? formData.certifications.trim() : null,
+          source: toBackendSource(formData.source)
         })
-      }).catch(err => console.warn('Backend update candidate issue:', err));
-    }
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(extractApiError(body, `Failed to update candidate (${res.status})`));
+      }
 
-    setCandidates(updatedList);
-    setShowEditModal(false);
-    setEditingCandidate(null);
-    showToast(`Candidate details for ${formData.name} updated!`);
+      setShowEditModal(false);
+      setEditingCandidate(null);
+      await Promise.all([fetchCandidatesFromBackend(), fetchCandidateStats()]);
+      showToast(`Candidate details for ${formData.name.trim()} updated!`);
+    } catch (err) {
+      const msg = err.message || 'Could not update candidate.';
+      setApiError(msg);
+      showToast(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // 16. Stage Update Handler
-  const handleUpdateStage = (candidateId, newStage, newStatus) => {
-    setCandidates(prev =>
-      prev.map(c => {
-        if (c.id === candidateId) {
-          return { ...c, currentStage: newStage, status: newStatus };
-        }
-        return c;
-      })
-    );
-
-    const token = sessionStorage.getItem('ats_urja_token') || currentUser?.token;
-    if (token) {
-      fetch(`http://localhost:8080/api/v1/candidates/${candidateId}/status?status=${newStatus.toUpperCase()}`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}` }
-      }).catch(err => console.warn('Backend status update issue:', err));
+  const handleUpdateStage = async (candidateId, newStage, newStatus) => {
+    const token = getAuthToken();
+    if (!token) {
+      showToast('Authentication required to update stage.');
+      return;
     }
 
-    setStageChangeCandidate(null);
-    setActiveMenuId(null);
-    showToast(`Recruitment stage updated to: ${newStage}`);
+    const backendStatus = toBackendStatus(newStatus);
+    try {
+      const res = await fetch(
+        `http://localhost:8080/api/v1/candidates/${candidateId}/status?status=${encodeURIComponent(backendStatus)}`,
+        {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(extractApiError(body, `Failed to update status (${res.status})`));
+      }
+
+      setStageChangeCandidate(null);
+      setActiveMenuId(null);
+      await Promise.all([fetchCandidatesFromBackend(), fetchCandidateStats()]);
+      showToast(`Recruitment stage updated to: ${newStage}`);
+    } catch (err) {
+      showToast(err.message || 'Could not update recruitment stage.');
+    }
   };
 
   // 17. Delete Candidate Handler
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!candidateToDelete) return;
-    const token = sessionStorage.getItem('ats_urja_token') || currentUser?.token;
-    if (token) {
-      fetch(`http://localhost:8080/api/v1/candidates/${candidateToDelete.id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
-      }).catch(err => console.warn('Backend delete issue:', err));
+    const token = getAuthToken();
+    if (!token) {
+      showToast('Authentication required to delete candidate.');
+      return;
     }
 
-    setCandidates(prev => prev.filter(c => c.id !== candidateToDelete.id));
-    setSelectedCandidateIds(prev => prev.filter(id => id !== candidateToDelete.id));
-    setStats(prev => ({
-      ...prev,
-      totalCandidates: Math.max(0, prev.totalCandidates - 1)
-    }));
-    setCandidateToDelete(null);
-    setActiveMenuId(null);
-    showToast('Candidate record removed successfully.');
+    try {
+      const res = await fetch(`http://localhost:8080/api/v1/candidates/${candidateToDelete.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(extractApiError(body, `Failed to delete candidate (${res.status})`));
+      }
+
+      const deletedId = candidateToDelete.id;
+      setSelectedCandidateIds(prev => prev.filter(id => id !== deletedId));
+      setCandidateToDelete(null);
+      setActiveMenuId(null);
+      await Promise.all([fetchCandidatesFromBackend(), fetchCandidateStats()]);
+      showToast('Candidate record removed successfully.');
+    } catch (err) {
+      showToast(err.message || 'Could not delete candidate.');
+    }
   };
 
-  // 18. Bulk Delete Handler
-  const handleBulkDelete = () => {
+  // 18. Bulk Actions Handlers
+  const handleBulkMoveToScreening = async () => {
     if (selectedCandidateIds.length === 0) return;
-    setCandidates(prev => prev.filter(c => !selectedCandidateIds.includes(c.id)));
-    setStats(prev => ({
-      ...prev,
-      totalCandidates: Math.max(0, prev.totalCandidates - selectedCandidateIds.length)
-    }));
-    showToast(`${selectedCandidateIds.length} candidates removed successfully.`);
-    setSelectedCandidateIds([]);
+    const token = getAuthToken();
+    if (!token) return;
+
+    try {
+      const results = await Promise.all(
+        selectedCandidateIds.map(id =>
+          fetch(`http://localhost:8080/api/v1/candidates/${id}/status?status=SCREENING`, {
+            method: 'PATCH',
+            headers: { Authorization: `Bearer ${token}` }
+          })
+        )
+      );
+      const failed = results.filter(r => !r.ok).length;
+      if (failed > 0) {
+        throw new Error(`Failed to update ${failed} selected candidate(s).`);
+      }
+
+      const count = selectedCandidateIds.length;
+      setSelectedCandidateIds([]);
+      await Promise.all([fetchCandidatesFromBackend(), fetchCandidateStats()]);
+      showToast(`Moved ${count} candidate(s) to Screening`);
+    } catch (err) {
+      showToast(err.message || 'Bulk stage update failed.');
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedCandidateIds.length === 0) return;
+    const token = getAuthToken();
+    if (!token) return;
+
+    try {
+      const results = await Promise.all(
+        selectedCandidateIds.map(id =>
+          fetch(`http://localhost:8080/api/v1/candidates/${id}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` }
+          })
+        )
+      );
+      const failed = results.filter(r => !r.ok).length;
+      if (failed > 0) {
+        throw new Error(`Failed to delete ${failed} selected candidate(s).`);
+      }
+
+      const count = selectedCandidateIds.length;
+      setSelectedCandidateIds([]);
+      await Promise.all([fetchCandidatesFromBackend(), fetchCandidateStats()]);
+      showToast(`${count} candidate(s) removed successfully.`);
+    } catch (err) {
+      showToast(err.message || 'Bulk deletion failed.');
+    }
   };
 
   return (
@@ -710,19 +812,26 @@ export default function CandidatesView({
                   name: '',
                   email: '',
                   mobile: '',
-                  requisitionId: '1',
-                  jobTitle: 'Software Engineer',
-                  department: 'Soya Division',
-                  location: 'Pune',
-                  experienceYears: 3,
-                  source: 'NAUKRI',
-                  currentCtc: 800000,
-                  expectedCtc: 1200000,
-                  noticePeriodDays: 30,
+                  requisitionId: '',
+                  jobTitle: '',
+                  department: '',
+                  location: '',
+                  experienceYears: '',
+                  source: '',
+                  currentEmployer: '',
+                  currentCtc: '',
+                  expectedCtc: '',
+                  noticePeriodDays: '',
                   primarySkills: '',
+                  linkedinUrl: '',
+                  professionalSummary: '',
+                  workExperience: '',
+                  educationDetails: '',
+                  certifications: '',
                   resumeFile: null
                 });
                 setFormErrors({});
+                setApiError('');
                 setShowAddModal(true);
               }}
             >
@@ -869,6 +978,11 @@ export default function CandidatesView({
               onChange={(e) => { setFilterReq(e.target.value); setCurrentPage(1); }}
             >
               <option value="ALL">All Requisitions</option>
+              {requisitions && requisitions.length > 0 && requisitions.map((r) => (
+                <option key={r.id} value={String(r.id)}>
+                  {r.reqCode ? `${r.reqCode} - ` : ''}{r.title || r.jobTitle}
+                </option>
+              ))}
               <option value="Software Engineer">Software Engineer</option>
               <option value="HR Executive">HR Executive</option>
               <option value="Quality Analyst">Quality Analyst</option>
@@ -1045,10 +1159,7 @@ export default function CandidatesView({
           <div className="urja-bulk-action-buttons">
             <button
               className="urja-bulk-btn stage"
-              onClick={() => {
-                showToast(`Bulk moved ${selectedCandidateIds.length} candidates to Screening`);
-                setSelectedCandidateIds([]);
-              }}
+              onClick={handleBulkMoveToScreening}
             >
               Move to Screening
             </button>
@@ -1067,6 +1178,19 @@ export default function CandidatesView({
               Cancel
             </button>
           </div>
+        </div>
+      )}
+
+      {fetchError && (
+        <div className="alert alert-danger d-flex align-items-center justify-content-between py-2 px-3 mb-3">
+          <span><i className="bi bi-exclamation-triangle-fill me-2"></i>{fetchError}</span>
+          <button
+            type="button"
+            className="btn btn-sm btn-outline-danger"
+            onClick={() => { fetchCandidatesFromBackend(); fetchCandidateStats(); }}
+          >
+            Retry
+          </button>
         </div>
       )}
 
@@ -1161,12 +1285,20 @@ export default function CandidatesView({
                       {/* Candidate Name & Photo */}
                       <td>
                         <div className="urja-cand-name-cell">
-                          <img
-                            src={cand.avatar}
-                            alt={cand.name}
-                            className="urja-cand-avatar-img"
-                            onError={(e) => { e.target.src = '/assets/images/man.jpg'; }}
-                          />
+                          {cand.avatar ? (
+                            <img
+                              src={cand.avatar}
+                              alt={cand.name}
+                              className="urja-cand-avatar-img"
+                            />
+                          ) : (
+                            <div
+                              className="urja-cand-avatar-img d-inline-flex align-items-center justify-content-center bg-light text-secondary fw-bold border"
+                              style={{ fontSize: '0.8rem', flexShrink: 0 }}
+                            >
+                              {(cand.name || 'C').split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
+                            </div>
+                          )}
                           <div className="urja-cand-name-info">
                             <span
                               className="urja-cand-name-text"
@@ -1174,6 +1306,9 @@ export default function CandidatesView({
                               title="Click to view full candidate profile & resume"
                             >
                               {cand.name}
+                              {cand.isVerified === true && (
+                                <i className="bi bi-patch-check-fill text-success ms-1" title="Verified by HR Admin" style={{ fontSize: '0.8rem' }}></i>
+                              )}
                             </span>
                             <span className="urja-cand-email-text">{cand.email}</span>
                           </div>
@@ -1183,11 +1318,13 @@ export default function CandidatesView({
                       {/* Job Title & Location */}
                       <td>
                         <div className="urja-cand-job-cell">
-                          <span className="urja-cand-job-title">{cand.jobTitle}</span>
-                          <span className="urja-cand-job-loc">
-                            <i className="bi bi-geo-alt"></i>
-                            {cand.location}
-                          </span>
+                          <span className="urja-cand-job-title">{cand.jobTitle || 'Not specified'}</span>
+                          {cand.location && (
+                            <span className="urja-cand-job-loc">
+                              <i className="bi bi-geo-alt"></i>
+                              {cand.location}
+                            </span>
+                          )}
                         </div>
                       </td>
 
@@ -1279,16 +1416,18 @@ export default function CandidatesView({
                                 <i className="bi bi-arrow-repeat text-primary"></i>
                                 <span>Change Stage</span>
                               </button>
-                              <button
-                                className="urja-more-menu-item"
-                                onClick={() => {
-                                  setActiveMenuId(null);
-                                  if (onScheduleInterview) onScheduleInterview(cand);
-                                }}
-                              >
-                                <i className="bi bi-calendar-plus text-info"></i>
-                                <span>Schedule Interview</span>
-                              </button>
+                              {isHRAdmin && (
+                                <button
+                                  className="urja-more-menu-item"
+                                  onClick={() => {
+                                    setActiveMenuId(null);
+                                    if (onScheduleInterview) onScheduleInterview(cand);
+                                  }}
+                                >
+                                  <i className="bi bi-calendar-plus text-info"></i>
+                                  <span>Schedule Interview</span>
+                                </button>
+                              )}
                               <button
                                 className="urja-more-menu-item"
                                 onClick={() => {
@@ -1363,7 +1502,7 @@ export default function CandidatesView({
               </select>
             </div>
 
-            {/* Pagination Button Controls: < 1 2 3 4 5 ... 25 > */}
+            {/* Pagination Button Controls */}
             <div className="urja-pagination-controls">
               <button
                 className="urja-page-btn"
@@ -1373,57 +1512,28 @@ export default function CandidatesView({
                 <i className="bi bi-chevron-left"></i>
               </button>
 
-              <button
-                className={`urja-page-btn ${currentPage === 1 ? 'active' : ''}`}
-                onClick={() => setCurrentPage(1)}
-              >
-                1
-              </button>
-
-              {totalPages >= 2 && (
-                <button
-                  className={`urja-page-btn ${currentPage === 2 ? 'active' : ''}`}
-                  onClick={() => setCurrentPage(2)}
-                >
-                  2
-                </button>
-              )}
-
-              {totalPages >= 3 && (
-                <button
-                  className={`urja-page-btn ${currentPage === 3 ? 'active' : ''}`}
-                  onClick={() => setCurrentPage(3)}
-                >
-                  3
-                </button>
-              )}
-
-              {totalPages >= 4 && (
-                <button
-                  className={`urja-page-btn ${currentPage === 4 ? 'active' : ''}`}
-                  onClick={() => setCurrentPage(4)}
-                >
-                  4
-                </button>
-              )}
-
-              {totalPages >= 5 && (
-                <button
-                  className={`urja-page-btn ${currentPage === 5 ? 'active' : ''}`}
-                  onClick={() => setCurrentPage(5)}
-                >
-                  5
-                </button>
-              )}
-
-              <span className="urja-page-dots">...</span>
-
-              <button
-                className={`urja-page-btn ${currentPage === 25 ? 'active' : ''}`}
-                onClick={() => setCurrentPage(Math.min(25, totalPages))}
-              >
-                25
-              </button>
+              {Array.from({ length: totalPages }, (_, idx) => idx + 1)
+                .filter(p => totalPages <= 7 || p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                .reduce((acc, p, idx, arr) => {
+                  if (idx > 0 && p - arr[idx - 1] > 1) {
+                    acc.push('ellipsis-' + p);
+                  }
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map(item =>
+                  typeof item === 'string' ? (
+                    <span key={item} className="urja-page-dots">...</span>
+                  ) : (
+                    <button
+                      key={item}
+                      className={`urja-page-btn ${currentPage === item ? 'active' : ''}`}
+                      onClick={() => setCurrentPage(item)}
+                    >
+                      {item}
+                    </button>
+                  )
+                )}
 
               <button
                 className="urja-page-btn"
@@ -1455,7 +1565,12 @@ export default function CandidatesView({
 
             <form onSubmit={handleAddSubmit}>
               <div className="urja-candidate-modal-body">
-                
+                {apiError && (
+                  <div className="alert alert-danger py-2 px-3 mb-3 small" role="alert">
+                    <i className="bi bi-exclamation-circle me-2"></i>{apiError}
+                  </div>
+                )}
+
                 {/* Full Name & Email */}
                 <div className="urja-form-row-2">
                   <div className="urja-filter-group">
@@ -1501,16 +1616,43 @@ export default function CandidatesView({
                     <label className="urja-filter-label">Assign to Job Requisition</label>
                     <select
                       className="urja-filter-select"
-                      value={formData.jobTitle}
-                      onChange={(e) => setFormData({ ...formData, jobTitle: e.target.value })}
+                      value={
+                        formData.requisitionId
+                          ? `req:${formData.requisitionId}`
+                          : (formData.jobTitle || '')
+                      }
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val.startsWith('req:')) {
+                          const reqId = val.slice(4);
+                          const matched = requisitions.find(r => String(r.id) === reqId);
+                          setFormData({
+                            ...formData,
+                            requisitionId: reqId,
+                            jobTitle: matched ? (matched.title || matched.jobTitle || formData.jobTitle) : formData.jobTitle,
+                            department: matched ? (matched.department || matched.departmentName || formData.department) : formData.department,
+                            location: matched ? (matched.location || formData.location) : formData.location
+                          });
+                        } else if (!val) {
+                          setFormData({ ...formData, requisitionId: '' });
+                        } else {
+                          setFormData({ ...formData, requisitionId: '', jobTitle: val });
+                        }
+                      }}
                     >
-                      <option value="Software Engineer">Software Engineer (Pune)</option>
-                      <option value="HR Executive">HR Executive (Mumbai)</option>
-                      <option value="Quality Analyst">Quality Analyst (Pune)</option>
-                      <option value="Production Engineer">Production Engineer (Shirdi)</option>
-                      <option value="Plant Operator">Plant Operator (Rahuri)</option>
-                      <option value="QA Executive">QA Executive (Pune)</option>
-                      <option value="Maintenance Engineer">Maintenance Engineer (Plant - Shirdi)</option>
+                      <option value="">Not specified / General Pipeline</option>
+                      {requisitions && requisitions.length > 0 && requisitions.map((r) => (
+                        <option key={r.id} value={`req:${r.id}`}>
+                          {r.reqCode ? `${r.reqCode} — ` : ''}{r.title || r.jobTitle}{r.location ? ` (${r.location})` : ''}
+                        </option>
+                      ))}
+                      <option value="Software Engineer">Software Engineer</option>
+                      <option value="HR Executive">HR Executive</option>
+                      <option value="Quality Analyst">Quality Analyst</option>
+                      <option value="Production Engineer">Production Engineer</option>
+                      <option value="Plant Operator">Plant Operator</option>
+                      <option value="QA Executive">QA Executive</option>
+                      <option value="Maintenance Engineer">Maintenance Engineer</option>
                     </select>
                   </div>
                 </div>
@@ -1518,12 +1660,13 @@ export default function CandidatesView({
                 {/* Department & Location */}
                 <div className="urja-form-row-2">
                   <div className="urja-filter-group">
-                    <label className="urja-filter-label">Department</label>
+                    <label className="urja-filter-label">Department (Optional)</label>
                     <select
                       className="urja-filter-select"
                       value={formData.department}
                       onChange={(e) => setFormData({ ...formData, department: e.target.value })}
                     >
+                      <option value="">Not specified</option>
                       <option value="Soya Division">Soya Division</option>
                       <option value="Plant Operations">Plant Operations</option>
                       <option value="Quality Assurance">Quality Assurance</option>
@@ -1534,12 +1677,13 @@ export default function CandidatesView({
                   </div>
 
                   <div className="urja-filter-group">
-                    <label className="urja-filter-label">Location</label>
+                    <label className="urja-filter-label">Location (Optional)</label>
                     <select
                       className="urja-filter-select"
                       value={formData.location}
                       onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                     >
+                      <option value="">Not specified</option>
                       <option value="Pune">Pune</option>
                       <option value="Mumbai">Mumbai</option>
                       <option value="Shirdi">Shirdi</option>
@@ -1552,11 +1696,12 @@ export default function CandidatesView({
                 {/* Experience & Notice Period */}
                 <div className="urja-form-row-2">
                   <div className="urja-filter-group">
-                    <label className="urja-filter-label">Experience (Years)</label>
+                    <label className="urja-filter-label">Experience (Years, Optional)</label>
                     <input
                       type="number"
                       step="0.5"
                       min="0"
+                      placeholder="Not specified"
                       className="urja-candidate-search-input"
                       value={formData.experienceYears}
                       onChange={(e) => setFormData({ ...formData, experienceYears: e.target.value })}
@@ -1564,12 +1709,13 @@ export default function CandidatesView({
                   </div>
 
                   <div className="urja-filter-group">
-                    <label className="urja-filter-label">Notice Period (Days)</label>
+                    <label className="urja-filter-label">Notice Period (Days, Optional)</label>
                     <select
                       className="urja-filter-select"
                       value={formData.noticePeriodDays}
                       onChange={(e) => setFormData({ ...formData, noticePeriodDays: e.target.value })}
                     >
+                      <option value="">Not specified</option>
                       <option value={0}>Immediate Joiner</option>
                       <option value={15}>15 Days</option>
                       <option value={30}>30 Days</option>
@@ -1579,13 +1725,45 @@ export default function CandidatesView({
                   </div>
                 </div>
 
+                {/* Source & Current Employer */}
+                <div className="urja-form-row-2">
+                  <div className="urja-filter-group">
+                    <label className="urja-filter-label">Application Source (Optional)</label>
+                    <select
+                      className="urja-filter-select"
+                      value={formData.source}
+                      onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+                    >
+                      <option value="">Not specified</option>
+                      <option value="Direct">Direct</option>
+                      <option value="LinkedIn">LinkedIn</option>
+                      <option value="Naukri">Naukri</option>
+                      <option value="Referral">Referral</option>
+                      <option value="Consultancy">Consultancy</option>
+                      <option value="Campus">Campus</option>
+                      <option value="Walk-in">Walk-in</option>
+                    </select>
+                  </div>
+
+                  <div className="urja-filter-group">
+                    <label className="urja-filter-label">Current Employer (Optional)</label>
+                    <input
+                      type="text"
+                      className="urja-candidate-search-input"
+                      placeholder="Only if provided by candidate"
+                      value={formData.currentEmployer}
+                      onChange={(e) => setFormData({ ...formData, currentEmployer: e.target.value })}
+                    />
+                  </div>
+                </div>
+
                 {/* Skills */}
                 <div className="urja-filter-group">
-                  <label className="urja-filter-label">Primary Key Skills</label>
+                  <label className="urja-filter-label">Primary Key Skills (Optional)</label>
                   <input
                     type="text"
                     className="urja-candidate-search-input"
-                    placeholder="e.g. React, Java, HACCP, Food Safety, PLC SCADA"
+                    placeholder="Only skills provided by candidate"
                     value={formData.primarySkills}
                     onChange={(e) => setFormData({ ...formData, primarySkills: e.target.value })}
                   />
@@ -1627,15 +1805,17 @@ export default function CandidatesView({
                   type="button"
                   className="urja-btn-secondary"
                   onClick={() => setShowAddModal(false)}
+                  disabled={isSubmitting}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   className="urja-btn-primary"
+                  disabled={isSubmitting}
                 >
                   <i className="bi bi-check2 me-1"></i>
-                  Register Candidate
+                  {isSubmitting ? 'Saving...' : 'Register Candidate'}
                 </button>
               </div>
             </form>
@@ -1660,7 +1840,12 @@ export default function CandidatesView({
 
             <form onSubmit={handleEditSubmit}>
               <div className="urja-candidate-modal-body">
-                
+                {apiError && (
+                  <div className="alert alert-danger py-2 px-3 mb-3 small" role="alert">
+                    <i className="bi bi-exclamation-circle me-2"></i>{apiError}
+                  </div>
+                )}
+
                 <div className="urja-form-row-2">
                   <div className="urja-filter-group">
                     <label className="urja-filter-label">Full Name *</label>
@@ -1720,13 +1905,60 @@ export default function CandidatesView({
                   </div>
 
                   <div className="urja-filter-group">
+                    <label className="urja-filter-label">Department</label>
+                    <input
+                      type="text"
+                      className="urja-candidate-search-input"
+                      value={formData.department}
+                      onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="urja-form-row-2">
+                  <div className="urja-filter-group">
                     <label className="urja-filter-label">Experience (Years)</label>
                     <input
                       type="number"
                       step="0.5"
+                      min="0"
                       className="urja-candidate-search-input"
                       value={formData.experienceYears}
                       onChange={(e) => setFormData({ ...formData, experienceYears: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="urja-filter-group">
+                    <label className="urja-filter-label">Notice Period (Days)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      className="urja-candidate-search-input"
+                      value={formData.noticePeriodDays}
+                      onChange={(e) => setFormData({ ...formData, noticePeriodDays: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="urja-form-row-2">
+                  <div className="urja-filter-group">
+                    <label className="urja-filter-label">Current Employer</label>
+                    <input
+                      type="text"
+                      className="urja-candidate-search-input"
+                      value={formData.currentEmployer}
+                      onChange={(e) => setFormData({ ...formData, currentEmployer: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="urja-filter-group">
+                    <label className="urja-filter-label">LinkedIn URL</label>
+                    <input
+                      type="text"
+                      className="urja-candidate-search-input"
+                      placeholder="https://linkedin.com/in/..."
+                      value={formData.linkedinUrl}
+                      onChange={(e) => setFormData({ ...formData, linkedinUrl: e.target.value })}
                     />
                   </div>
                 </div>
@@ -1741,6 +1973,56 @@ export default function CandidatesView({
                   />
                 </div>
 
+                <div className="urja-filter-group">
+                  <label className="urja-filter-label">Professional Summary (HR / Candidate Provided)</label>
+                  <textarea
+                    rows={2}
+                    className="urja-candidate-search-input"
+                    value={formData.professionalSummary}
+                    onChange={(e) => setFormData({ ...formData, professionalSummary: e.target.value })}
+                  />
+                </div>
+
+                <div className="urja-filter-group">
+                  <label className="urja-filter-label">Work Experience</label>
+                  <textarea
+                    rows={2}
+                    className="urja-candidate-search-input"
+                    value={formData.workExperience}
+                    onChange={(e) => setFormData({ ...formData, workExperience: e.target.value })}
+                  />
+                </div>
+
+                <div className="urja-filter-group">
+                  <label className="urja-filter-label">Education Details</label>
+                  <textarea
+                    rows={2}
+                    className="urja-candidate-search-input"
+                    value={formData.educationDetails}
+                    onChange={(e) => setFormData({ ...formData, educationDetails: e.target.value })}
+                  />
+                </div>
+
+                <div className="urja-filter-group">
+                  <label className="urja-filter-label">Certifications</label>
+                  <textarea
+                    rows={2}
+                    className="urja-candidate-search-input"
+                    value={formData.certifications}
+                    onChange={(e) => setFormData({ ...formData, certifications: e.target.value })}
+                  />
+                </div>
+
+                <div className="urja-filter-group">
+                  <label className="urja-filter-label">HR Notes</label>
+                  <textarea
+                    rows={2}
+                    className="urja-candidate-search-input"
+                    value={formData.hrNotes}
+                    onChange={(e) => setFormData({ ...formData, hrNotes: e.target.value })}
+                  />
+                </div>
+
               </div>
 
               <div className="urja-candidate-modal-footer">
@@ -1748,15 +2030,17 @@ export default function CandidatesView({
                   type="button"
                   className="urja-btn-secondary"
                   onClick={() => setShowEditModal(false)}
+                  disabled={isSubmitting}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   className="urja-btn-primary"
+                  disabled={isSubmitting}
                 >
                   <i className="bi bi-save me-1"></i>
-                  Save Changes
+                  {isSubmitting ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </form>

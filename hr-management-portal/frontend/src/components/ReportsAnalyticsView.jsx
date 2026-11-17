@@ -368,9 +368,6 @@ export default function ReportsAnalyticsView({ currentUser, onToast }) {
     }));
   }, [stats]);
 
-  // Recent Hiring Activity List
-  const recentActivities = [];
-
   // Close drill-down drawer when user presses Escape
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -1234,63 +1231,6 @@ export default function ReportsAnalyticsView({ currentUser, onToast }) {
               ))}
             </tbody>
           </table>
-        </div>
-      </section>
-
-      {/* 8. Recent Hiring Activity Feed */}
-      <section className="urja-reports-table-card">
-        <div className="urja-reports-table-header">
-          <div>
-            <h3 className="fw-bold text-dark mb-1" style={{ fontSize: '1.1rem' }}>
-              Recent Hiring Activity
-            </h3>
-            <p className="text-muted small mb-0">
-              Live updates on candidates cleared through offer generation, interviews, and joining dates.
-            </p>
-          </div>
-        </div>
-
-        <div className="p-3">
-          <div className="d-flex flex-column gap-2">
-            {recentActivities.map((act) => (
-              <div
-                key={act.id}
-                className="d-flex align-items-center justify-content-between p-2 rounded"
-                style={{ background: '#F8FAFC', border: '1px solid #E2E8F0' }}
-              >
-                <div className="d-flex align-items-center gap-3">
-                  <div
-                    style={{
-                      width: 38,
-                      height: 38,
-                      borderRadius: '50%',
-                      background: '#EAF7F0',
-                      color: '#087B55',
-                      fontWeight: 700,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '0.85rem'
-                    }}
-                  >
-                    {act.avatarText}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#26364A' }}>
-                      {act.candidate} — <span style={{ fontWeight: 500, color: '#718096' }}>{act.role}</span>
-                    </div>
-                    <div style={{ fontSize: '0.78rem', color: '#718096' }}>
-                      {act.dept} • {act.action}
-                    </div>
-                  </div>
-                </div>
-                <div className="text-end">
-                  <span className="badge bg-light text-dark border me-2">{act.status}</span>
-                  <small className="text-muted">{act.date}</small>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
       </section>
 

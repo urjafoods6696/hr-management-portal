@@ -2,6 +2,7 @@ package com.company.hr.controller;
 
 import com.company.hr.dto.ApiResponse;
 import com.company.hr.dto.DashboardSummaryResponse;
+import com.company.hr.dto.MonthlyHiringPerformanceResponse;
 import com.company.hr.service.DashboardService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -13,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v1/dashboard")
+@RequestMapping({"/api/v1/dashboard", "/api/dashboard"})
 @RequiredArgsConstructor
 @Tag(name = "Dashboard", description = "High-level metrics, hiring progress, and TAT alerts")
 public class DashboardController {
@@ -35,5 +36,13 @@ public class DashboardController {
             @org.springframework.security.core.annotation.AuthenticationPrincipal com.company.hr.security.UserPrincipal currentUser) {
         com.company.hr.dto.PersonalizedDashboardResponse personalized = dashboardService.getPersonalizedDashboard(currentUser);
         return ResponseEntity.ok(ApiResponse.ok(personalized));
+    }
+
+    @GetMapping("/monthly-performance")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Get database-driven monthly hiring performance KPIs and trends")
+    public ResponseEntity<ApiResponse<MonthlyHiringPerformanceResponse>> getMonthlyHiringPerformance() {
+        MonthlyHiringPerformanceResponse performance = dashboardService.getMonthlyHiringPerformance();
+        return ResponseEntity.ok(ApiResponse.ok(performance));
     }
 }

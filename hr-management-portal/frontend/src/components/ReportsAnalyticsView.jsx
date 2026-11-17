@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import { dashboardService, API_BASE_URL } from '../services/api';
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -48,33 +49,72 @@ export default function ReportsAnalyticsView({ currentUser, onToast }) {
     departmentBreakdown: {}
   });
 
-  useEffect(() => {
-    const token = typeof window !== 'undefined' ? (sessionStorage.getItem('ats_urja_token') || currentUser?.token) : null;
-    if (!token) return;
+  // Live Monthly Hiring Performance State from Backend (Live MySQL Source of Truth)
+  const [perfData, setPerfData] = useState({
+    applications: 0,
+    interviews: 0,
+    joined: 0,
+    monthlyPerformance: []
+  });
+  const [perfLoading, setPerfLoading] = useState(true);
+  const [perfError, setPerfError] = useState(null);
 
-    fetch('http://localhost:8080/api/v1/dashboard/summary', {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-      .then(res => res.ok ? res.json() : null)
-      .then(body => {
-        if (body && body.data) {
-          const d = body.data;
-          let totalReqs = 0;
-          if (d.statusBreakdown) {
-            totalReqs = Object.values(d.statusBreakdown).reduce((a, b) => a + Number(b), 0);
-          }
-          setStats({
-            totalRequisitions: totalReqs,
-            totalOpenVacancies: d.totalOpenVacancies || 0,
-            avgTatDays: d.avgTatDays || 0,
-            offerAcceptanceRate: d.activeCandidates > 0 ? (d.offerRatio || 0) : 0,
-            activeCandidates: d.activeCandidates || 0,
-            statusBreakdown: d.statusBreakdown || {},
-            departmentBreakdown: d.departmentBreakdown || {}
-          });
+  // Fetch Live Database-Driven Monthly Hiring Performance
+  const fetchMonthlyPerformance = async () => {
+    try {
+      const data = await dashboardService.getMonthlyPerformance();
+      if (data) {
+        setPerfData({
+          applications: Number(data.applications) || 0,
+          interviews: Number(data.interviews) || 0,
+          joined: Number(data.joined) || 0,
+          monthlyPerformance: Array.isArray(data.monthlyPerformance) ? data.monthlyPerformance : []
+        });
+        setPerfError(null);
+      }
+    } catch (err) {
+      console.warn('Could not fetch monthly hiring performance from database:', err);
+      setPerfError(err);
+    } finally {
+      setPerfLoading(false);
+    }
+  };
+
+  // Fetch Dashboard Summary Stats
+  const fetchSummaryStats = async () => {
+    try {
+      const d = await dashboardService.getSummary();
+      if (d) {
+        let totalReqs = 0;
+        if (d.statusBreakdown) {
+          totalReqs = Object.values(d.statusBreakdown).reduce((a, b) => a + Number(b), 0);
         }
-      })
-      .catch(err => console.warn('Could not fetch reports dashboard summary:', err));
+        setStats({
+          totalRequisitions: totalReqs,
+          totalOpenVacancies: d.totalOpenVacancies || 0,
+          avgTatDays: d.avgTatDays || 0,
+          offerAcceptanceRate: d.activeCandidates > 0 ? (d.offerRatio || 0) : 0,
+          activeCandidates: d.activeCandidates || 0,
+          statusBreakdown: d.statusBreakdown || {},
+          departmentBreakdown: d.departmentBreakdown || {}
+        });
+      }
+    } catch (err) {
+      console.warn('Could not fetch reports dashboard summary:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchSummaryStats();
+    fetchMonthlyPerformance();
+
+    // Automatic Data Refresh at 30 seconds interval (Requirement 6)
+    const intervalId = setInterval(() => {
+      fetchMonthlyPerformance();
+      fetchSummaryStats();
+    }, 30000);
+
+    return () => clearInterval(intervalId);
   }, [currentUser]);
 
   // Active Drill-down Drawer State
@@ -84,12 +124,46 @@ export default function ReportsAnalyticsView({ currentUser, onToast }) {
   const [showPerfInfo, setShowPerfInfo] = useState(false);
   const [isPerfExpanded, setIsPerfExpanded] = useState(false);
 
+  // Live Database-Driven Monthly Hiring Data
   const monthlyHiringData = useMemo(() => {
-    if (!stats.totalRequisitions && !stats.activeCandidates) {
-      return [{ month: 'Current', applications: 0, interviews: 0, joined: 0 }];
+    if (perfData.monthlyPerformance && perfData.monthlyPerformance.length > 0) {
+      return perfData.monthlyPerformance.map(d => ({
+        month: d.month,
+        monthName: d.monthName || d.month,
+        applications: Number(d.applications) || 0,
+        interviews: Number(d.interviews) || 0,
+        joined: Number(d.joined) || 0
+      }));
     }
-    return [{ month: 'Current', applications: stats.activeCandidates, interviews: 0, joined: 0 }];
-  }, [stats]);
+    // Fallback 6 months with 0s if no records yet
+    const months = ['Jun 2026', 'Jul 2026', 'Aug 2026', 'Sep 2026', 'Oct 2026', 'Nov 2026'];
+    return months.map(m => ({ month: m, applications: 0, interviews: 0, joined: 0 }));
+  }, [perfData.monthlyPerformance]);
+
+  // Dynamic YAxis Domain & Ticks based on real data
+  const maxPerfValue = useMemo(() => {
+    return Math.max(
+      0,
+      ...monthlyHiringData.map(d => Math.max(d.applications, d.interviews, d.joined))
+    );
+  }, [monthlyHiringData]);
+
+  const perfYDomain = useMemo(() => {
+    if (maxPerfValue === 0) return [0, 5];
+    if (maxPerfValue <= 4) return [0, 5];
+    if (maxPerfValue <= 10) return [0, 10];
+    const top = Math.ceil(maxPerfValue * 1.25);
+    return [0, top];
+  }, [maxPerfValue]);
+
+  const perfYTicks = useMemo(() => {
+    if (maxPerfValue === 0) return [0, 1, 2, 3, 4, 5];
+    if (maxPerfValue <= 4) return [0, 1, 2, 3, 4, 5];
+    if (maxPerfValue <= 10) return [0, 2, 4, 6, 8, 10];
+    const top = Math.ceil(maxPerfValue * 1.25);
+    const step = Math.ceil(top / 4);
+    return [0, step, step * 2, step * 3, step * 4];
+  }, [maxPerfValue]);
 
   // Custom renderers for Monthly Hiring Performance chart
   const renderCustomBarLabel = (props) => {
@@ -218,48 +292,41 @@ export default function ReportsAnalyticsView({ currentUser, onToast }) {
 
   const handleSummaryCardClick = (type) => {
     if (type === 'APPLICATIONS') {
+      const total = perfData.applications || 0;
       setActiveDrilldown({
         type: 'APPLICATIONS',
-        title: 'Total Applications Pipeline (1,759)',
+        title: `Total Applications Pipeline (${total.toLocaleString()})`,
         subtitle: 'Candidate sourcing breakdown across active requisition channels.',
-        value: '1,759 Total Sourced',
-        label: '+14.2% Growth vs Last Period',
+        value: `${total.toLocaleString()} Total Sourced`,
+        label: total > 0 ? `${total} candidate records in database` : '0 candidate records recorded',
         items: [
-          { title: 'Job Portals (Naukri, LinkedIn, Indeed)', meta: '703 applications (40.0%)' },
-          { title: 'Employee Referrals & Internal Network', meta: '352 applications (20.0%)' },
-          { title: 'Campus Recruitment Drives', meta: '264 applications (15.0%)' },
-          { title: 'Direct Walk-in Applications', meta: '176 applications (10.0%)' },
-          { title: 'Recruitment Agency Partners', meta: '139 applications (7.9%)' },
-          { title: 'Careers Portal Direct Inquiries', meta: '125 applications (7.1%)' }
+          { title: 'Job Portals & Direct Applications', meta: `${total} candidates in ATS pipeline` },
+          { title: 'Database Records Status', meta: total > 0 ? 'Verified live applications in MySQL' : 'Awaiting incoming candidate applications' }
         ]
       });
     } else if (type === 'INTERVIEWS') {
+      const total = perfData.interviews || 0;
       setActiveDrilldown({
         type: 'INTERVIEWS',
-        title: 'Conducted Interviews (467)',
+        title: `Conducted Interviews (${total.toLocaleString()})`,
         subtitle: 'Technical evaluations, managerial reviews, and HR screenings.',
-        value: '467 Interviews',
-        label: '+8.9% Activity vs Target',
+        value: `${total.toLocaleString()} Candidates Interviewed`,
+        label: total > 0 ? `${total} candidates reached interview stage` : '0 candidates reached interview stage',
         items: [
-          { title: 'Initial Screening & HR Fitment', meta: '185 candidates screened' },
-          { title: 'Technical & Domain Assessment', meta: '162 panel sessions conducted' },
-          { title: 'HOD & Leadership Round', meta: '86 final evaluations held' },
-          { title: 'Management Final Review', meta: '34 compensation & offer discussions' }
+          { title: 'Interview Evaluation Panels', meta: `${total} distinct candidates evaluated` },
+          { title: 'Scheduling Status', meta: total > 0 ? 'Active interview records in database' : 'No interviews scheduled yet' }
         ]
       });
     } else if (type === 'JOINED') {
+      const total = perfData.joined || 0;
       setActiveDrilldown({
         type: 'JOINED',
-        title: 'Candidates Successfully Joined (100)',
+        title: `Candidates Successfully Joined (${total.toLocaleString()})`,
         subtitle: 'New team members onboarded across plants and corporate offices.',
-        value: '100 Joiners',
-        label: '+11.1% Achievement vs Target',
+        value: `${total.toLocaleString()} Joiners`,
+        label: total > 0 ? `${total} joiners successfully integrated` : '0 joiners recorded in database',
         items: [
-          { title: 'Plant Operations & Manufacturing', meta: '38 joiners inducted' },
-          { title: 'Engineering & Technology', meta: '24 software & automation engineers' },
-          { title: 'Quality Assurance & Compliance', meta: '15 specialists deployed' },
-          { title: 'Maintenance & Facility Support', meta: '12 technicians active' },
-          { title: 'Accounts & Human Resources', meta: '11 corporate team members' }
+          { title: 'Onboarding & Deployment Status', meta: total > 0 ? `${total} candidates with status JOINED` : 'No candidates marked as joined yet' }
         ]
       });
     }
@@ -773,9 +840,12 @@ export default function ReportsAnalyticsView({ currentUser, onToast }) {
                 <div className="urja-perf-summary-info">
                   <span className="urja-perf-summary-label">Applications</span>
                   <div className="urja-perf-summary-stat-row">
-                    <span className="urja-perf-summary-val">1,759</span>
+                    <span className="urja-perf-summary-val">
+                      {perfLoading ? '...' : (perfData.applications || 0).toLocaleString()}
+                    </span>
                     <span className="urja-perf-summary-trend">
-                      <i className="bi bi-arrow-up-right"></i> +14.2%
+                      <i className="bi bi-database text-success me-1"></i>
+                      {perfData.applications > 0 ? `${perfData.applications} Total` : '0 Total'}
                     </span>
                   </div>
                 </div>
@@ -793,9 +863,12 @@ export default function ReportsAnalyticsView({ currentUser, onToast }) {
                 <div className="urja-perf-summary-info">
                   <span className="urja-perf-summary-label">Interviews</span>
                   <div className="urja-perf-summary-stat-row">
-                    <span className="urja-perf-summary-val">467</span>
+                    <span className="urja-perf-summary-val">
+                      {perfLoading ? '...' : (perfData.interviews || 0).toLocaleString()}
+                    </span>
                     <span className="urja-perf-summary-trend">
-                      <i className="bi bi-arrow-up-right"></i> +8.9%
+                      <i className="bi bi-database text-success me-1"></i>
+                      {perfData.interviews > 0 ? `${perfData.interviews} Total` : '0 Total'}
                     </span>
                   </div>
                 </div>
@@ -813,9 +886,12 @@ export default function ReportsAnalyticsView({ currentUser, onToast }) {
                 <div className="urja-perf-summary-info">
                   <span className="urja-perf-summary-label">Candidates Joined</span>
                   <div className="urja-perf-summary-stat-row">
-                    <span className="urja-perf-summary-val">100</span>
+                    <span className="urja-perf-summary-val">
+                      {perfLoading ? '...' : (perfData.joined || 0).toLocaleString()}
+                    </span>
                     <span className="urja-perf-summary-trend">
-                      <i className="bi bi-arrow-up-right"></i> +11.1%
+                      <i className="bi bi-database text-success me-1"></i>
+                      {perfData.joined > 0 ? `${perfData.joined} Total` : '0 Total'}
                     </span>
                   </div>
                 </div>
@@ -855,8 +931,9 @@ export default function ReportsAnalyticsView({ currentUser, onToast }) {
                     axisLine={{ stroke: '#E2E8F0' }}
                   />
                   <YAxis
-                    domain={[0, 340]}
-                    ticks={[0, 85, 170, 255, 340]}
+                    domain={perfYDomain}
+                    ticks={perfYTicks}
+                    allowDecimals={false}
                     stroke="#718096"
                     fontSize={11}
                     tickLine={false}
@@ -1385,7 +1462,7 @@ export default function ReportsAnalyticsView({ currentUser, onToast }) {
               <div className="d-flex flex-column gap-2 mb-3">
                 <div className="p-2 rounded bg-light border">
                   <div className="fw-bold text-success mb-1">
-                    <i className="bi bi-inbox-fill me-1"></i> Applications (1,759 Total)
+                    <i className="bi bi-inbox-fill me-1"></i> Applications ({perfData.applications || 0} Total)
                   </div>
                   <div className="text-muted small">
                     All candidate profiles sourced through direct portals, campus drives, referrals, and recruitment agencies.
@@ -1393,7 +1470,7 @@ export default function ReportsAnalyticsView({ currentUser, onToast }) {
                 </div>
                 <div className="p-2 rounded bg-light border">
                   <div className="fw-bold text-success mb-1">
-                    <i className="bi bi-people-fill me-1"></i> Interviews (467 Total)
+                    <i className="bi bi-people-fill me-1"></i> Interviews ({perfData.interviews || 0} Total)
                   </div>
                   <div className="text-muted small">
                     Evaluation panels conducted including technical rounds, managerial interviews, and HR fitment assessments.
@@ -1401,7 +1478,7 @@ export default function ReportsAnalyticsView({ currentUser, onToast }) {
                 </div>
                 <div className="p-2 rounded bg-light border">
                   <div className="fw-bold text-warning-emphasis mb-1" style={{ color: '#D9480F' }}>
-                    <i className="bi bi-person-check-fill me-1"></i> Candidates Joined (100 Total)
+                    <i className="bi bi-person-check-fill me-1"></i> Candidates Joined ({perfData.joined || 0} Total)
                   </div>
                   <div className="text-muted small">
                     New employees who accepted offers and successfully completed Day 1 onboarding and plant deployment.
@@ -1438,7 +1515,7 @@ export default function ReportsAnalyticsView({ currentUser, onToast }) {
                 </div>
                 <div>
                   <h5 className="m-0 fw-bold text-dark">Monthly Hiring Performance – Full Analytics</h5>
-                  <span className="text-muted small">May 2026 – Oct 2026 detailed pipeline throughput</span>
+                  <span className="text-muted small">Live pipeline throughput recorded in MySQL database</span>
                 </div>
               </div>
               <button
@@ -1457,7 +1534,7 @@ export default function ReportsAnalyticsView({ currentUser, onToast }) {
                   >
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                     <XAxis dataKey="month" stroke="#718096" fontSize={12} />
-                    <YAxis domain={[0, 340]} ticks={[0, 85, 170, 255, 340]} stroke="#718096" fontSize={12} />
+                    <YAxis domain={perfYDomain} ticks={perfYTicks} allowDecimals={false} stroke="#718096" fontSize={12} />
                     <Tooltip content={<CustomPerfTooltip />} />
                     <Legend content={renderCustomLegend} />
                     <Bar dataKey="applications" name="Applications" fill="#087B55" radius={[4, 4, 0, 0]} barSize={28} label={renderCustomBarLabel} />
@@ -1481,22 +1558,24 @@ export default function ReportsAnalyticsView({ currentUser, onToast }) {
                     <tr>
                       <td className="text-start fw-bold text-success">Applications</td>
                       {monthlyHiringData.map((d, i) => <td key={i}>{d.applications}</td>)}
-                      <td className="fw-bold table-success">1,759</td>
+                      <td className="fw-bold table-success">{perfData.applications || 0}</td>
                     </tr>
                     <tr>
                       <td className="text-start fw-bold text-primary">Interviews</td>
                       {monthlyHiringData.map((d, i) => <td key={i}>{d.interviews}</td>)}
-                      <td className="fw-bold table-success">467</td>
+                      <td className="fw-bold table-success">{perfData.interviews || 0}</td>
                     </tr>
                     <tr>
                       <td className="text-start fw-bold text-danger">Candidates Joined</td>
                       {monthlyHiringData.map((d, i) => <td key={i}>{d.joined}</td>)}
-                      <td className="fw-bold table-success">100</td>
+                      <td className="fw-bold table-success">{perfData.joined || 0}</td>
                     </tr>
                     <tr>
                       <td className="text-start text-muted">Interview Conversion</td>
-                      {monthlyHiringData.map((d, i) => <td key={i}>{((d.interviews / d.applications) * 100).toFixed(1)}%</td>)}
-                      <td className="fw-bold table-success">26.5%</td>
+                      {monthlyHiringData.map((d, i) => <td key={i}>{d.applications > 0 ? ((d.interviews / d.applications) * 100).toFixed(1) + '%' : '0.0%'}</td>)}
+                      <td className="fw-bold table-success">
+                        {perfData.applications > 0 ? ((perfData.interviews / perfData.applications) * 100).toFixed(1) + '%' : '0.0%'}
+                      </td>
                     </tr>
                   </tbody>
                 </table>

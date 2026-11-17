@@ -7,7 +7,10 @@ export const LAST_ACTIVITY_KEY = 'ats_urja_last_activity';
 export const SESSION_EXPIRED_KEY = 'ats_session_expired_msg';
 
 // Base URL configuration
-export const API_BASE_URL = (typeof window !== 'undefined' && window.__API_BASE_URL__) || 'http://localhost:8080';
+export const API_BASE_URL = 
+  (typeof window !== 'undefined' && window.__API_BASE_URL__) || 
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE_URL) || 
+  'http://localhost:8080';
 
 /**
  * Safely parse a JWT token payload without external libraries.
@@ -382,6 +385,26 @@ export const authService = {
     } finally {
       clearAuthSession();
     }
+  }
+};
+
+export const dashboardService = {
+  async getMonthlyPerformance() {
+    const response = await api.get('/api/v1/dashboard/monthly-performance');
+    const body = response.data;
+    return body.data || body;
+  },
+
+  async getSummary() {
+    const response = await api.get('/api/v1/dashboard/summary');
+    const body = response.data;
+    return body.data || body;
+  },
+
+  async getPersonalized() {
+    const response = await api.get('/api/v1/dashboard/personalized');
+    const body = response.data;
+    return body.data || body;
   }
 };
 

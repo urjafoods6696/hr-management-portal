@@ -1,4 +1,4 @@
-import api, { authService, userService, getStoredToken, getStoredUser, setAuthSession, clearAuthSession, isJwtTokenValid, registerAuthFailureHandler } from './services/api';
+import api, { authService, userService, getStoredToken, getStoredUser, setAuthSession, clearAuthSession, isJwtTokenValid, registerAuthFailureHandler, API_BASE_URL } from './services/api';
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import './styles/portal.css';
 import './styles/urja-dashboard.css';
@@ -550,7 +550,7 @@ export default function App() {
     if (!token) return;
 
     let isMounted = true;
-    fetch('http://localhost:8080/api/v1/dashboard/personalized', {
+    fetch(`${API_BASE_URL}/api/v1/dashboard/personalized`, {
       headers: {
         'Authorization': `Bearer ${token}`
       }
@@ -577,7 +577,7 @@ export default function App() {
     const token = sessionStorage.getItem('ats_urja_token') || currentUser.token;
     if (!token) return;
 
-    fetch('http://localhost:8080/api/v1/admin/audit-logs', {
+    fetch(`${API_BASE_URL}/api/v1/admin/audit-logs`, {
       headers: { 'Authorization': `Bearer ${token}` }
     })
       .then(res => res.ok ? res.json() : null)
@@ -608,7 +608,7 @@ export default function App() {
       const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
 
       // 1. Fetch unread count
-      const countRes = await fetch('http://localhost:8080/api/v1/notifications/unread-count', { headers });
+      const countRes = await fetch(`${API_BASE_URL}/api/v1/notifications/unread-count`, { headers });
       if (countRes.ok) {
         const countData = await countRes.json();
         if (countData?.data?.unreadCount !== undefined) {
@@ -617,7 +617,7 @@ export default function App() {
       }
 
       // 2. Fetch notifications list
-      const listRes = await fetch('http://localhost:8080/api/v1/notifications', { headers });
+      const listRes = await fetch(`${API_BASE_URL}/api/v1/notifications`, { headers });
       if (listRes.ok) {
         const listData = await listRes.json();
         if (Array.isArray(listData?.data)) {
@@ -647,7 +647,7 @@ export default function App() {
     if (!token) return;
 
     let isMounted = true;
-    fetch('http://localhost:8080/api/v1/requisitions?size=100', {
+    fetch(`${API_BASE_URL}/api/v1/requisitions?size=100`, {
       headers: { 'Authorization': `Bearer ${token}` }
     })
       .then(res => res.ok ? res.json() : null)
@@ -713,7 +713,7 @@ export default function App() {
     const token = sessionStorage.getItem('ats_urja_token') || currentUser?.token;
     if (token) {
       try {
-        const res = await fetch(`http://localhost:8080/api/v1/notifications/${notifId}/read`, {
+        const res = await fetch(`${API_BASE_URL}/api/v1/notifications/${notifId}/read`, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -756,7 +756,7 @@ export default function App() {
     const token = sessionStorage.getItem('ats_urja_token') || currentUser?.token;
     if (token) {
       try {
-        await fetch('http://localhost:8080/api/v1/notifications/read-all', {
+        await fetch(`${API_BASE_URL}/api/v1/notifications/read-all`, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`
@@ -1139,7 +1139,7 @@ export default function App() {
     }
 
     try {
-      const res = await fetch('http://localhost:8080/api/v1/approvals/pending-count', {
+      const res = await fetch(`${API_BASE_URL}/api/v1/approvals/pending-count`, {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -1153,7 +1153,7 @@ export default function App() {
       }
 
       // Fallback to summary-stats endpoint
-      const fbRes = await fetch('http://localhost:8080/api/v1/approvals/summary-stats', {
+      const fbRes = await fetch(`${API_BASE_URL}/api/v1/approvals/summary-stats`, {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -1816,7 +1816,7 @@ export default function App() {
                               const rawId = String(tsk.id).replace('tsk-', '');
                               if (!isNaN(Number(rawId))) {
                                 const token = sessionStorage.getItem('ats_urja_token') || currentUser?.token;
-                                fetch(`http://localhost:8080/api/v1/tasks/${rawId}/status`, {
+                                fetch(`${API_BASE_URL}/api/v1/tasks/${rawId}/status`, {
                                   method: 'PATCH',
                                   headers: {
                                     'Content-Type': 'application/json',

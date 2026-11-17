@@ -1,6 +1,7 @@
 package com.company.hr.service;
 
 import com.company.hr.dto.DashboardSummaryResponse;
+import com.company.hr.dto.MonthlyHiringPerformanceResponse;
 import com.company.hr.dto.PersonalizedDashboardResponse;
 import com.company.hr.dto.RequisitionResponse;
 import com.company.hr.dto.TatSummaryResponse;
@@ -16,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -107,6 +109,43 @@ public class DashboardService {
                 .departmentBreakdown(deptBreakdown)
                 .recentRequisitions(recent)
                 .tatAlerts(tatAlertsList)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public MonthlyHiringPerformanceResponse getMonthlyHiringPerformance() {
+        long totalApplications = candidateRepository.count();
+        long totalInterviews = candidateRepository.countCandidatesReachedInterview();
+        long totalJoined = candidateRepository.countByStatus(Candidate.CandidateStatus.JOINED);
+
+        List<MonthlyHiringPerformanceResponse.MonthMetricDto> monthlyMetrics = new ArrayList<>();
+        YearMonth currentYearMonth = YearMonth.now();
+        DateTimeFormatter monthYearFormatter = DateTimeFormatter.ofPattern("MMM yyyy");
+        DateTimeFormatter monthNameFormatter = DateTimeFormatter.ofPattern("MMMM");
+
+        for (int i = 5; i >= 0; i--) {
+            YearMonth ym = currentYearMonth.minusMonths(i);
+            LocalDateTime start = ym.atDay(1).atStartOfDay();
+            LocalDateTime end = ym.plusMonths(1).atDay(1).atStartOfDay();
+
+            long monthApps = candidateRepository.countApplicationsInPeriod(start, end);
+            long monthInts = candidateRepository.countCandidatesReachedInterviewInPeriod(start, end);
+            long monthJoined = candidateRepository.countJoinedInPeriod(start, end);
+
+            monthlyMetrics.add(MonthlyHiringPerformanceResponse.MonthMetricDto.builder()
+                    .month(ym.format(monthYearFormatter))
+                    .monthName(ym.format(monthNameFormatter))
+                    .applications(monthApps)
+                    .interviews(monthInts)
+                    .joined(monthJoined)
+                    .build());
+        }
+
+        return MonthlyHiringPerformanceResponse.builder()
+                .applications(totalApplications)
+                .interviews(totalInterviews)
+                .joined(totalJoined)
+                .monthlyPerformance(monthlyMetrics)
                 .build();
     }
 

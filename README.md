@@ -94,4 +94,4 @@ npm run dev
 
 ## 🔗 Repository Information
 - **Project**: TalentPulse HR Management Portal (`hr-management-portal`)
-- **GitHub**: [https://github.com/Ajay-Bhor/hr-management-portal](https://github.com/Ajay-Bhor/hr-management-portal)
+- **GitHub**: [https://github.com/urjafoods6696/hr-management-portal](https://github.com/urjafoods6696/hr-management-portal)

@@ -3,7 +3,7 @@ set "PATH=%~dp0tools\git\cmd;%PATH%"
 cd /d "%~dp0"
 echo ========================================================
 echo Pushing hr-management-portal project to GitHub:
-echo https://github.com/Ajay-Bhor/hr-management-portal.git
+echo https://github.com/urjafoods6696/hr-management-portal.git
 echo ========================================================
 echo.
 git status
@@ -14,12 +14,12 @@ echo.
 if %ERRORLEVEL% equ 0 (
     echo ========================================================
     echo SUCCESS: Project pushed successfully to GitHub!
-    echo https://github.com/Ajay-Bhor/hr-management-portal
+    echo https://github.com/urjafoods6696/hr-management-portal
     echo ========================================================
 ) else (
     echo ========================================================
     echo PUSH FAILED:
-    echo 1. Ensure https://github.com/Ajay-Bhor/hr-management-portal is created or renamed on GitHub.
+    echo 1. Ensure https://github.com/urjafoods6696/hr-management-portal is created on GitHub.
     echo 2. Check your GitHub credentials / internet connection.
     echo ========================================================
 )

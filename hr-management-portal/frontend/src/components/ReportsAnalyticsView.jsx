@@ -1169,49 +1169,7 @@ export default function ReportsAnalyticsView({ currentUser, onToast }) {
         </div>
       </section>
 
-      {/* 6. Additional Sections: Recruitment Efficiency, Approval Analytics & Insights */}
-      <section className="urja-insights-grid" aria-label="Efficiency and Insights">
-        {/* Efficiency Metric */}
-        <div className="urja-insight-card">
-          <div className="urja-insight-icon-box">
-            <i className="bi bi-lightning-charge"></i>
-          </div>
-          <div>
-            <div className="urja-insight-title">Recruitment Velocity & Efficiency</div>
-            <p className="urja-insight-desc">
-              Average sourcing turnaround is <strong>6.2 days</strong>, with a cost-per-hire of <strong>₹24,500</strong>, exceeding corporate cost benchmarks by 18%.
-            </p>
-          </div>
-        </div>
-
-        {/* Approval Speed Metric */}
-        <div className="urja-insight-card">
-          <div className="urja-insight-icon-box">
-            <i className="bi bi-shield-check"></i>
-          </div>
-          <div>
-            <div className="urja-insight-title">Approval Workflow Turnaround</div>
-            <p className="urja-insight-desc">
-              Multi-tier approval resolution clocks at <strong>1.4 days</strong>. 94% of requisition and offer sign-offs clear without requisition revisions.
-            </p>
-          </div>
-        </div>
-
-        {/* Actionable Talent Insight */}
-        <div className="urja-insight-card">
-          <div className="urja-insight-icon-box">
-            <i className="bi bi-lightbulb"></i>
-          </div>
-          <div>
-            <div className="urja-insight-title">Actionable Talent Insights</div>
-            <p className="urja-insight-desc">
-              Employee referrals yield the highest 1-year retention (96%) and 4.2-day shorter interview-to-offer cycles across manufacturing plants.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* 7. Department Performance Table */}
+      {/* 6. Department Performance Table */}
       <section className="urja-reports-table-card">
         <div className="urja-reports-table-header">
           <div>

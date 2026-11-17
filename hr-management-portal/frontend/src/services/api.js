@@ -389,8 +389,8 @@ export const authService = {
 };
 
 export const dashboardService = {
-  async getMonthlyPerformance() {
-    const response = await api.get('/api/v1/dashboard/monthly-performance');
+  async getMonthlyPerformance(params = {}) {
+    const response = await api.get('/api/v1/dashboard/monthly-performance', { params });
     const body = response.data;
     return body.data || body;
   },

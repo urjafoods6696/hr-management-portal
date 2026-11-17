@@ -112,39 +112,119 @@ public class DashboardService {
                 .build();
     }
 
+    private String resolveDepartmentToken(String department) {
+        if (department == null || department.isBlank() || 
+            department.equalsIgnoreCase("ALL") || 
+            department.equalsIgnoreCase("All Departments")) {
+            return null;
+        }
+        String clean = department.trim();
+        if (clean.toLowerCase().contains("engineering")) return "Engineering";
+        if (clean.toLowerCase().contains("plant") || clean.toLowerCase().contains("operations")) return "Operations";
+        if (clean.toLowerCase().contains("quality")) return "Quality";
+        if (clean.toLowerCase().contains("human resources") || clean.equalsIgnoreCase("hr")) return "Human Resources";
+        if (clean.toLowerCase().contains("supply chain")) return "Supply Chain";
+        if (clean.toLowerCase().contains("finance")) return "Finance";
+        if (clean.toLowerCase().contains("sales")) return "Sales";
+        if (clean.toLowerCase().contains("marketing")) return "Marketing";
+        return clean;
+    }
+
     @Transactional(readOnly = true)
     public MonthlyHiringPerformanceResponse getMonthlyHiringPerformance() {
-        long totalApplications = candidateRepository.count();
-        long totalInterviews = candidateRepository.countCandidatesReachedInterview();
-        long totalJoined = candidateRepository.countByStatus(Candidate.CandidateStatus.JOINED);
+        return getMonthlyHiringPerformance(null, null, null);
+    }
 
-        List<MonthlyHiringPerformanceResponse.MonthMetricDto> monthlyMetrics = new ArrayList<>();
-        YearMonth currentYearMonth = YearMonth.now();
-        DateTimeFormatter monthYearFormatter = DateTimeFormatter.ofPattern("MMM yyyy");
-        DateTimeFormatter monthNameFormatter = DateTimeFormatter.ofPattern("MMMM");
+    @Transactional(readOnly = true)
+    public MonthlyHiringPerformanceResponse getMonthlyHiringPerformance(Integer year, Integer month, String department) {
+        String deptToken = resolveDepartmentToken(department);
+        boolean hasDept = (deptToken != null && !deptToken.isBlank());
 
-        for (int i = 5; i >= 0; i--) {
-            YearMonth ym = currentYearMonth.minusMonths(i);
+        int currentYear = LocalDate.now().getYear();
+        boolean isYearSpecified = (year != null && year > 1900 && year < 2100);
+        int targetYear = isYearSpecified ? year : currentYear;
+
+        long totalApplications;
+        long totalInterviews;
+        long totalJoined;
+
+        // If a specific month is selected (1-12)
+        if (month != null && month >= 1 && month <= 12) {
+            YearMonth ym = YearMonth.of(targetYear, month);
             LocalDateTime start = ym.atDay(1).atStartOfDay();
             LocalDateTime end = ym.plusMonths(1).atDay(1).atStartOfDay();
 
-            long monthApps = candidateRepository.countApplicationsInPeriod(start, end);
-            long monthInts = candidateRepository.countCandidatesReachedInterviewInPeriod(start, end);
-            long monthJoined = candidateRepository.countJoinedInPeriod(start, end);
+            totalApplications = candidateRepository.countApplicationsInPeriodFiltered(start, end, hasDept, deptToken);
+            totalInterviews = candidateRepository.countCandidatesReachedInterviewInPeriodFiltered(start, end, hasDept, deptToken);
+            totalJoined = candidateRepository.countJoinedInPeriodFiltered(start, end, hasDept, deptToken);
+        } else if (isYearSpecified) {
+            // Entire specified year
+            LocalDateTime start = LocalDateTime.of(targetYear, 1, 1, 0, 0, 0);
+            LocalDateTime end = LocalDateTime.of(targetYear + 1, 1, 1, 0, 0, 0);
+
+            totalApplications = candidateRepository.countApplicationsInPeriodFiltered(start, end, hasDept, deptToken);
+            totalInterviews = candidateRepository.countCandidatesReachedInterviewInPeriodFiltered(start, end, hasDept, deptToken);
+            totalJoined = candidateRepository.countJoinedInPeriodFiltered(start, end, hasDept, deptToken);
+        } else {
+            // All historical data
+            totalApplications = candidateRepository.countApplicationsAllTimeFiltered(hasDept, deptToken);
+            totalInterviews = candidateRepository.countCandidatesReachedInterviewFilteredAllTime(hasDept, deptToken);
+            totalJoined = candidateRepository.countJoinedAllTimeFiltered(hasDept, deptToken);
+        }
+
+        List<MonthlyHiringPerformanceResponse.MonthMetricDto> monthlyMetrics = new ArrayList<>();
+        DateTimeFormatter monthYearFormatter = DateTimeFormatter.ofPattern("MMM yyyy");
+        DateTimeFormatter monthNameFormatter = DateTimeFormatter.ofPattern("MMMM");
+
+        if (month != null && month >= 1 && month <= 12) {
+            // Focused on selected month
+            YearMonth ym = YearMonth.of(targetYear, month);
+            LocalDateTime start = ym.atDay(1).atStartOfDay();
+            LocalDateTime end = ym.plusMonths(1).atDay(1).atStartOfDay();
+
+            long mApps = candidateRepository.countApplicationsInPeriodFiltered(start, end, hasDept, deptToken);
+            long mInts = candidateRepository.countCandidatesReachedInterviewInPeriodFiltered(start, end, hasDept, deptToken);
+            long mJoined = candidateRepository.countJoinedInPeriodFiltered(start, end, hasDept, deptToken);
 
             monthlyMetrics.add(MonthlyHiringPerformanceResponse.MonthMetricDto.builder()
                     .month(ym.format(monthYearFormatter))
                     .monthName(ym.format(monthNameFormatter))
-                    .applications(monthApps)
-                    .interviews(monthInts)
-                    .joined(monthJoined)
+                    .monthNumber(month)
+                    .year(targetYear)
+                    .applications(mApps)
+                    .interviews(mInts)
+                    .joined(mJoined)
                     .build());
+        } else {
+            // All 12 months for target year
+            for (int m = 1; m <= 12; m++) {
+                YearMonth ym = YearMonth.of(targetYear, m);
+                LocalDateTime start = ym.atDay(1).atStartOfDay();
+                LocalDateTime end = ym.plusMonths(1).atDay(1).atStartOfDay();
+
+                long mApps = candidateRepository.countApplicationsInPeriodFiltered(start, end, hasDept, deptToken);
+                long mInts = candidateRepository.countCandidatesReachedInterviewInPeriodFiltered(start, end, hasDept, deptToken);
+                long mJoined = candidateRepository.countJoinedInPeriodFiltered(start, end, hasDept, deptToken);
+
+                monthlyMetrics.add(MonthlyHiringPerformanceResponse.MonthMetricDto.builder()
+                        .month(ym.format(monthYearFormatter))
+                        .monthName(ym.format(monthNameFormatter))
+                        .monthNumber(m)
+                        .year(targetYear)
+                        .applications(mApps)
+                        .interviews(mInts)
+                        .joined(mJoined)
+                        .build());
+            }
         }
 
         return MonthlyHiringPerformanceResponse.builder()
                 .applications(totalApplications)
                 .interviews(totalInterviews)
                 .joined(totalJoined)
+                .selectedYear(targetYear)
+                .selectedMonth(month)
+                .department(department != null ? department : "All Departments")
                 .monthlyPerformance(monthlyMetrics)
                 .build();
     }

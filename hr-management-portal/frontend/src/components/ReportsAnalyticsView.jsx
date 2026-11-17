@@ -33,6 +33,8 @@ const THEME_COLORS = {
 
 export default function ReportsAnalyticsView({ currentUser, onToast }) {
   // Filters State
+  const [selectedYear, setSelectedYear] = useState('2026');
+  const [selectedMonth, setSelectedMonth] = useState('ALL');
   const [dateRange, setDateRange] = useState('Last 30 Days');
   const [selectedDept, setSelectedDept] = useState('All Departments');
   const [searchTerm, setSearchTerm] = useState('');
@@ -59,10 +61,22 @@ export default function ReportsAnalyticsView({ currentUser, onToast }) {
   const [perfLoading, setPerfLoading] = useState(true);
   const [perfError, setPerfError] = useState(null);
 
-  // Fetch Live Database-Driven Monthly Hiring Performance
-  const fetchMonthlyPerformance = async () => {
+  // Fetch Live Database-Driven Monthly Hiring Performance with Filters (Year, Month, Department)
+  const fetchMonthlyPerformance = async (yearVal = selectedYear, monthVal = selectedMonth, deptVal = selectedDept) => {
     try {
-      const data = await dashboardService.getMonthlyPerformance();
+      setPerfLoading(true);
+      const params = {};
+      if (yearVal && yearVal !== 'ALL') {
+        params.year = parseInt(yearVal, 10);
+      }
+      if (monthVal && monthVal !== 'ALL') {
+        params.month = parseInt(monthVal, 10);
+      }
+      if (deptVal && deptVal !== 'All Departments') {
+        params.department = deptVal;
+      }
+
+      const data = await dashboardService.getMonthlyPerformance(params);
       if (data) {
         setPerfData({
           applications: Number(data.applications) || 0,
@@ -106,16 +120,16 @@ export default function ReportsAnalyticsView({ currentUser, onToast }) {
 
   useEffect(() => {
     fetchSummaryStats();
-    fetchMonthlyPerformance();
+    fetchMonthlyPerformance(selectedYear, selectedMonth, selectedDept);
 
     // Automatic Data Refresh at 30 seconds interval (Requirement 6)
     const intervalId = setInterval(() => {
-      fetchMonthlyPerformance();
+      fetchMonthlyPerformance(selectedYear, selectedMonth, selectedDept);
       fetchSummaryStats();
     }, 30000);
 
     return () => clearInterval(intervalId);
-  }, [currentUser]);
+  }, [selectedYear, selectedMonth, selectedDept, currentUser]);
 
   // Active Drill-down Drawer State
   const [activeDrilldown, setActiveDrilldown] = useState(null);
@@ -581,22 +595,48 @@ export default function ReportsAnalyticsView({ currentUser, onToast }) {
       {/* 2. Controls & Filter Bar */}
       <section className="urja-reports-filter-bar" aria-label="Reports Filters">
         <div className="urja-filter-group">
+          {/* Year Filter */}
           <div className="urja-filter-item">
-            <i className="bi bi-calendar3"></i>
-            <span>Date Range:</span>
+            <i className="bi bi-calendar-event"></i>
+            <span>Year:</span>
             <select
               className="urja-filter-select"
-              value={dateRange}
-              onChange={(e) => setDateRange(e.target.value)}
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
             >
-              <option value="Last 30 Days">Last 30 Days</option>
-              <option value="Q3 2026">Q3 2026 (Jul - Sep)</option>
-              <option value="Q4 2026">Q4 2026 (Oct - Dec)</option>
-              <option value="Year-to-Date">Year-to-Date 2026</option>
-              <option value="All Time">All Historical Data</option>
+              <option value="2026">2026</option>
+              <option value="2025">2025</option>
+              <option value="2024">2024</option>
+              <option value="ALL">All Years</option>
             </select>
           </div>
 
+          {/* Month Filter */}
+          <div className="urja-filter-item">
+            <i className="bi bi-calendar3"></i>
+            <span>Month:</span>
+            <select
+              className="urja-filter-select"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+            >
+              <option value="ALL">All Months</option>
+              <option value="1">January</option>
+              <option value="2">February</option>
+              <option value="3">March</option>
+              <option value="4">April</option>
+              <option value="5">May</option>
+              <option value="6">June</option>
+              <option value="7">July</option>
+              <option value="8">August</option>
+              <option value="9">September</option>
+              <option value="10">October</option>
+              <option value="11">November</option>
+              <option value="12">December</option>
+            </select>
+          </div>
+
+          {/* Department Filter */}
           <div className="urja-filter-item">
             <i className="bi bi-building"></i>
             <span>Department:</span>
@@ -607,11 +647,48 @@ export default function ReportsAnalyticsView({ currentUser, onToast }) {
             >
               <option value="All Departments">All Departments</option>
               <option value="Engineering & IT">Engineering & IT</option>
+              <option value="Engineering & Technology">Engineering & Technology</option>
               <option value="Plant Operations">Plant Operations</option>
+              <option value="Operations & Supply Chain">Operations & Supply Chain</option>
               <option value="Quality & Compliance">Quality & Compliance</option>
               <option value="Human Resources">Human Resources</option>
+              <option value="Human Resources & Talent Acquisition">Human Resources & Talent Acquisition</option>
               <option value="Supply Chain & Logistics">Supply Chain & Logistics</option>
               <option value="Finance & Accounts">Finance & Accounts</option>
+              <option value="Finance, Tax & Accounts">Finance, Tax & Accounts</option>
+              <option value="Global Sales & Enterprise BD">Global Sales & Enterprise BD</option>
+              <option value="Brand Marketing & Communications">Brand Marketing & Communications</option>
+              <option value="Soya Division">Soya Division</option>
+            </select>
+          </div>
+
+          {/* Date Range Quick Selector */}
+          <div className="urja-filter-item">
+            <i className="bi bi-clock-history"></i>
+            <span>Date Range:</span>
+            <select
+              className="urja-filter-select"
+              value={dateRange}
+              onChange={(e) => {
+                const val = e.target.value;
+                setDateRange(val);
+                if (val === 'Last 30 Days') {
+                  setSelectedYear('2026');
+                  setSelectedMonth('11');
+                } else if (val === 'Year-to-Date') {
+                  setSelectedYear('2026');
+                  setSelectedMonth('ALL');
+                } else if (val === 'All Time') {
+                  setSelectedYear('ALL');
+                  setSelectedMonth('ALL');
+                }
+              }}
+            >
+              <option value="Last 30 Days">Last 30 Days</option>
+              <option value="Q3 2026">Q3 2026 (Jul - Sep)</option>
+              <option value="Q4 2026">Q4 2026 (Oct - Dec)</option>
+              <option value="Year-to-Date">Year-to-Date 2026</option>
+              <option value="All Time">All Historical Data</option>
             </select>
           </div>
         </div>
@@ -627,12 +704,14 @@ export default function ReportsAnalyticsView({ currentUser, onToast }) {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          {(selectedDept !== 'All Departments' || searchTerm || dateRange !== 'Last 30 Days') && (
+          {(selectedDept !== 'All Departments' || selectedYear !== '2026' || selectedMonth !== 'ALL' || searchTerm || dateRange !== 'Last 30 Days') && (
             <button
               type="button"
               className="urja-filter-reset-btn"
               onClick={() => {
                 setSelectedDept('All Departments');
+                setSelectedYear('2026');
+                setSelectedMonth('ALL');
                 setSearchTerm('');
                 setDateRange('Last 30 Days');
               }}
@@ -657,7 +736,7 @@ export default function ReportsAnalyticsView({ currentUser, onToast }) {
               <div className="urja-hiring-perf-header-titles">
                 <h3 className="urja-hiring-perf-header-title">Monthly Hiring Performance</h3>
                 <span className="urja-hiring-perf-header-subtitle">
-                  Applications, Interviews and Joined candidates trend
+                  {selectedDept !== 'All Departments' ? selectedDept : 'All Departments'} • {selectedMonth !== 'ALL' ? (['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][parseInt(selectedMonth, 10) - 1]) : 'All Months'} {selectedYear !== 'ALL' ? selectedYear : 'All Years'}
                 </span>
               </div>
             </div>

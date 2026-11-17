@@ -15,6 +15,9 @@ public class MonthlyHiringPerformanceResponse {
     private long applications;
     private long interviews;
     private long joined;
+    private Integer selectedYear;
+    private Integer selectedMonth;
+    private String department;
     private List<MonthMetricDto> monthlyPerformance;
 
     @Data
@@ -24,6 +27,8 @@ public class MonthlyHiringPerformanceResponse {
     public static class MonthMetricDto {
         private String month;
         private String monthName;
+        private Integer monthNumber;
+        private Integer year;
         private long applications;
         private long interviews;
         private long joined;

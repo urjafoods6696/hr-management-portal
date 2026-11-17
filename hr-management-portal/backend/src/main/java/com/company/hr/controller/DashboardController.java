@@ -41,8 +41,11 @@ public class DashboardController {
     @GetMapping("/monthly-performance")
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Get database-driven monthly hiring performance KPIs and trends")
-    public ResponseEntity<ApiResponse<MonthlyHiringPerformanceResponse>> getMonthlyHiringPerformance() {
-        MonthlyHiringPerformanceResponse performance = dashboardService.getMonthlyHiringPerformance();
+    public ResponseEntity<ApiResponse<MonthlyHiringPerformanceResponse>> getMonthlyHiringPerformance(
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer year,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer month,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String department) {
+        MonthlyHiringPerformanceResponse performance = dashboardService.getMonthlyHiringPerformance(year, month, department);
         return ResponseEntity.ok(ApiResponse.ok(performance));
     }
 }

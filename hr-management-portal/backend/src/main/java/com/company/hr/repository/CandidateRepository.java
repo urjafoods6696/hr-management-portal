@@ -116,5 +116,88 @@ public interface CandidateRepository extends JpaRepository<Candidate, Long> {
     @Query("SELECT COUNT(c) FROM Candidate c WHERE c.status = com.company.hr.entity.Candidate.CandidateStatus.JOINED " +
            "AND (COALESCE(c.updatedAt, c.createdAt) >= :start AND COALESCE(c.updatedAt, c.createdAt) < :end)")
     long countJoinedInPeriod(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query("SELECT COUNT(c) FROM Candidate c " +
+           "LEFT JOIN c.requisition r " +
+           "LEFT JOIN r.department d " +
+           "WHERE (:hasDept = false OR " +
+           "     LOWER(COALESCE(c.storedDepartment, '')) LIKE LOWER(CONCAT('%', :deptToken, '%')) OR " +
+           "     LOWER(COALESCE(d.departmentName, '')) LIKE LOWER(CONCAT('%', :deptToken, '%')))")
+    long countApplicationsAllTimeFiltered(
+            @Param("hasDept") boolean hasDept,
+            @Param("deptToken") String deptToken);
+
+    @Query("SELECT COUNT(c) FROM Candidate c " +
+           "LEFT JOIN c.requisition r " +
+           "LEFT JOIN r.department d " +
+           "WHERE c.createdAt >= :start AND c.createdAt < :end " +
+           "AND (:hasDept = false OR " +
+           "     LOWER(COALESCE(c.storedDepartment, '')) LIKE LOWER(CONCAT('%', :deptToken, '%')) OR " +
+           "     LOWER(COALESCE(d.departmentName, '')) LIKE LOWER(CONCAT('%', :deptToken, '%')))")
+    long countApplicationsInPeriodFiltered(
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end,
+            @Param("hasDept") boolean hasDept,
+            @Param("deptToken") String deptToken);
+
+    @Query("SELECT COUNT(DISTINCT c.id) FROM Candidate c " +
+           "LEFT JOIN c.requisition r " +
+           "LEFT JOIN r.department d " +
+           "WHERE (:hasDept = false OR " +
+           "     LOWER(COALESCE(c.storedDepartment, '')) LIKE LOWER(CONCAT('%', :deptToken, '%')) OR " +
+           "     LOWER(COALESCE(d.departmentName, '')) LIKE LOWER(CONCAT('%', :deptToken, '%'))) " +
+           "AND (c.id IN (SELECT i.candidate.id FROM Interview i) OR " +
+           "     c.status IN (com.company.hr.entity.Candidate.CandidateStatus.INTERVIEW_SCHEDULED, " +
+           "                  com.company.hr.entity.Candidate.CandidateStatus.INTERVIEW_IN_PROGRESS, " +
+           "                  com.company.hr.entity.Candidate.CandidateStatus.OFFER_EXTENDED, " +
+           "                  com.company.hr.entity.Candidate.CandidateStatus.OFFER_ACCEPTED, " +
+           "                  com.company.hr.entity.Candidate.CandidateStatus.JOINED))")
+    long countCandidatesReachedInterviewFilteredAllTime(
+            @Param("hasDept") boolean hasDept,
+            @Param("deptToken") String deptToken);
+
+    @Query("SELECT COUNT(DISTINCT c.id) FROM Candidate c " +
+           "LEFT JOIN c.requisition r " +
+           "LEFT JOIN r.department d " +
+           "WHERE (:hasDept = false OR " +
+           "     LOWER(COALESCE(c.storedDepartment, '')) LIKE LOWER(CONCAT('%', :deptToken, '%')) OR " +
+           "     LOWER(COALESCE(d.departmentName, '')) LIKE LOWER(CONCAT('%', :deptToken, '%'))) " +
+           "AND ((c.id IN (SELECT i.candidate.id FROM Interview i WHERE COALESCE(i.scheduledAt, i.createdAt) >= :start AND COALESCE(i.scheduledAt, i.createdAt) < :end)) " +
+           "     OR (c.status IN (com.company.hr.entity.Candidate.CandidateStatus.INTERVIEW_SCHEDULED, " +
+           "                      com.company.hr.entity.Candidate.CandidateStatus.INTERVIEW_IN_PROGRESS, " +
+           "                      com.company.hr.entity.Candidate.CandidateStatus.OFFER_EXTENDED, " +
+           "                      com.company.hr.entity.Candidate.CandidateStatus.OFFER_ACCEPTED, " +
+           "                      com.company.hr.entity.Candidate.CandidateStatus.JOINED) " +
+           "         AND COALESCE(c.updatedAt, c.createdAt) >= :start AND COALESCE(c.updatedAt, c.createdAt) < :end))")
+    long countCandidatesReachedInterviewInPeriodFiltered(
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end,
+            @Param("hasDept") boolean hasDept,
+            @Param("deptToken") String deptToken);
+
+    @Query("SELECT COUNT(c) FROM Candidate c " +
+           "LEFT JOIN c.requisition r " +
+           "LEFT JOIN r.department d " +
+           "WHERE c.status = com.company.hr.entity.Candidate.CandidateStatus.JOINED " +
+           "AND (:hasDept = false OR " +
+           "     LOWER(COALESCE(c.storedDepartment, '')) LIKE LOWER(CONCAT('%', :deptToken, '%')) OR " +
+           "     LOWER(COALESCE(d.departmentName, '')) LIKE LOWER(CONCAT('%', :deptToken, '%')))")
+    long countJoinedAllTimeFiltered(
+            @Param("hasDept") boolean hasDept,
+            @Param("deptToken") String deptToken);
+
+    @Query("SELECT COUNT(c) FROM Candidate c " +
+           "LEFT JOIN c.requisition r " +
+           "LEFT JOIN r.department d " +
+           "WHERE c.status = com.company.hr.entity.Candidate.CandidateStatus.JOINED " +
+           "AND COALESCE(c.updatedAt, c.createdAt) >= :start AND COALESCE(c.updatedAt, c.createdAt) < :end " +
+           "AND (:hasDept = false OR " +
+           "     LOWER(COALESCE(c.storedDepartment, '')) LIKE LOWER(CONCAT('%', :deptToken, '%')) OR " +
+           "     LOWER(COALESCE(d.departmentName, '')) LIKE LOWER(CONCAT('%', :deptToken, '%')))")
+    long countJoinedInPeriodFiltered(
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end,
+            @Param("hasDept") boolean hasDept,
+            @Param("deptToken") String deptToken);
 }
 

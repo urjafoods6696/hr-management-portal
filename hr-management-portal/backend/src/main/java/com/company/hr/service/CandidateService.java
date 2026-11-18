@@ -58,7 +58,8 @@ public class CandidateService {
             Candidate.CandidateStatus.INTERVIEW_IN_PROGRESS);
     private static final List<Candidate.CandidateStatus> OFFER_STATUSES = List.of(
             Candidate.CandidateStatus.OFFER_EXTENDED,
-            Candidate.CandidateStatus.OFFER_ACCEPTED);
+            Candidate.CandidateStatus.OFFER_ACCEPTED,
+            Candidate.CandidateStatus.JOINING_SCHEDULED);
     private static final List<Candidate.CandidateStatus> REJECTED_STATUSES = List.of(
             Candidate.CandidateStatus.REJECTED,
             Candidate.CandidateStatus.WITHDRAWN);
@@ -190,7 +191,7 @@ public class CandidateService {
                     statusNames = SCREENING_STATUSES.stream().map(Enum::name).toList();
                 case "INTERVIEW", "IN_INTERVIEW", "INTERVIEW_SCHEDULED" ->
                     statusNames = INTERVIEW_STATUSES.stream().map(Enum::name).toList();
-                case "OFFER", "OFFER_STAGE", "OFFER_EXTENDED" ->
+                case "OFFER", "OFFER_STAGE", "OFFER_EXTENDED", "JOINING_SCHEDULED" ->
                     statusNames = OFFER_STATUSES.stream().map(Enum::name).toList();
                 case "REJECTED" ->
                     statusNames = REJECTED_STATUSES.stream().map(Enum::name).toList();

@@ -14,7 +14,6 @@ PREPARE stmt FROM @stmt;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
--- Seed default passwords for system user accounts
-UPDATE users SET password = 'password' WHERE password IS NULL;
-UPDATE users SET password = 'password' WHERE username = 'itadmin';
+-- Ensure password column is populated with the secure BCrypt hash rather than plaintext 'password'
+UPDATE users SET password = password_hash WHERE password IS NULL;
 

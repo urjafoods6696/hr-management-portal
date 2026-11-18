@@ -4,7 +4,6 @@
 -- ==============================================================================
 
 SET NAMES utf8mb4;
-SET FOREIGN_KEY_CHECKS = 0;
 
 -- 1. Create Offers Table
 CREATE TABLE IF NOT EXISTS offers (
@@ -58,7 +57,23 @@ CREATE TABLE IF NOT EXISTS onboarding_checklists (
     CONSTRAINT fk_onboarding_offer FOREIGN KEY (offer_id) REFERENCES offers(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 3. Ensure Candidate Records exist for all 24 Offers
+-- 3. Ensure Requisitions 21 to 27 exist for candidate and offer associations
+INSERT INTO requisitions (
+    id, requisition_code, job_title, department_id, designation_id,
+    headcount, position_type, priority, experience_years_min, experience_years_max,
+    min_budget, max_budget, job_description, justification, status,
+    created_by, assigned_recruiter_id, tat_start_date, tat_target_days, due_date
+) VALUES
+(21, 'URJ-R-2026-008', 'Software Engineer', 1, 2, 2, 'NEW_HEADCOUNT', 'CRITICAL', 3, 6, 900000.00, 1200000.00, 'Full stack application development in Spring Boot & React', 'Engineering capacity expansion', 'OFFER_IN_PROGRESS', 5, 3, '2026-09-01', 30, '2026-10-15'),
+(22, 'URJ-R-2026-007', 'HR Executive', 3, 8, 2, 'REPLACEMENT', 'HIGH', 2, 5, 600000.00, 800000.00, 'Employee onboarding and recruitment coordination', 'HR team backfill', 'OFFER_IN_PROGRESS', 2, 3, '2026-09-05', 30, '2026-10-20'),
+(23, 'URJ-R-2026-006', 'Quality Analyst', 1, 4, 1, 'NEW_HEADCOUNT', 'MEDIUM', 3, 5, 650000.00, 850000.00, 'QA automation and test execution', 'QA quality certification', 'OFFER_IN_PROGRESS', 5, 4, '2026-09-10', 30, '2026-10-25'),
+(24, 'URJ-R-2026-005', 'Production Engineer', 5, 10, 2, 'NEW_HEADCOUNT', 'HIGH', 4, 7, 850000.00, 1100000.00, 'Plant production process control and oversight', 'Capacity increase', 'OFFER_IN_PROGRESS', 6, 4, '2026-09-12', 30, '2026-10-30'),
+(25, 'URJ-R-2026-025', 'Plant Operator', 5, 10, 3, 'REPLACEMENT', 'MEDIUM', 2, 4, 450000.00, 600000.00, 'Boiler and silo equipment operation', 'Plant maintenance backfill', 'OFFER_IN_PROGRESS', 6, 3, '2026-09-15', 30, '2026-10-31'),
+(26, 'URJ-R-2026-026', 'QA / QC Executive', 1, 4, 2, 'NEW_HEADCOUNT', 'HIGH', 3, 6, 700000.00, 900000.00, 'Quality compliance, HACCP, and lab testing', 'Compliance requirements', 'OFFER_IN_PROGRESS', 5, 3, '2026-09-18', 30, '2026-11-05'),
+(27, 'URJ-R-2026-027', 'Maintenance Engineer', 5, 10, 1, 'NEW_HEADCOUNT', 'MEDIUM', 3, 6, 750000.00, 950000.00, 'Electrical and mechanical maintenance of plant machinery', 'Facility expansion', 'OFFER_IN_PROGRESS', 5, 4, '2026-09-20', 30, '2026-11-10')
+ON DUPLICATE KEY UPDATE job_title=VALUES(job_title);
+
+-- 4. Ensure Candidate Records exist for all 24 Offers
 -- Insert mock candidates 101 to 124 if not present
 INSERT IGNORE INTO candidates (id, candidate_code, name, email, mobile, experience_years, current_employer, current_designation, current_ctc, expected_ctc, notice_period_days, primary_skills, source, requisition_id, status)
 VALUES
@@ -87,7 +102,7 @@ VALUES
 (123, 'CAN-2026-M23', 'Ajay Shinde', 'ajay.shinde@gmail.com', '+91 98221 44565', 5.0, 'Mahindra Logistics', 'Dispatch Officer', 6.2, 8.0, 30, 'Vehicle Tracking, LR Booking, E-way Bill', 'NAUKRI', 27, 'OFFER_EXTENDED'),
 (124, 'CAN-2026-M24', 'Pallavi Nalawade', 'pallavi.nalawade@gmail.com', '+91 98221 44566', 3.2, 'Marico', 'Safety Officer', 5.0, 6.8, 15, 'Fire Safety, PPE Compliance, HAZOP', 'COMPANY_CAREERS', 21, 'OFFER_ACCEPTED');
 
--- 4. Seed the 24 Offers with exact status distribution:
+-- 5. Seed the 24 Offers with exact status distribution:
 -- Total Offers: 24
 -- Offers Sent: 8
 -- Accepted: 6
@@ -95,8 +110,6 @@ VALUES
 -- Joining Scheduled: 5
 -- Onboarding in Progress: 4 (within Accepted / Joining Scheduled)
 -- Onboarded: 3
-TRUNCATE TABLE onboarding_checklists;
-DELETE FROM offers;
 
 INSERT INTO offers (id, offer_code, candidate_id, candidate_name, candidate_email, requisition_id, requisition_code, job_title, department, location, offer_date, joining_date, ctc_fixed, ctc_variable, ctc_total, status, onboarding_status, approval_stage, offer_letter_url, notes, created_by)
 VALUES
@@ -198,5 +211,3 @@ VALUES
 (4, 'OFFER_ACCEPTANCE', 'Signed Offer Letter Copy', TRUE, 'Priyanka Deshmukh', '2026-10-06 14:00:00', 'Accepted.'),
 (4, 'IDENTITY_ADDRESS', 'Aadhaar & PAN Verification', TRUE, 'Priyanka Deshmukh', '2026-10-07 10:00:00', 'Verified.'),
 (4, 'FORMALITIES', 'Plant Safety Briefing & Medical Fitness', FALSE, NULL, NULL, 'Scheduled at Shirdi plant.');
-
-SET FOREIGN_KEY_CHECKS = 1;

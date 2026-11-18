@@ -97,6 +97,7 @@ public interface CandidateRepository extends JpaRepository<Candidate, Long> {
            "com.company.hr.entity.Candidate.CandidateStatus.INTERVIEW_IN_PROGRESS, " +
            "com.company.hr.entity.Candidate.CandidateStatus.OFFER_EXTENDED, " +
            "com.company.hr.entity.Candidate.CandidateStatus.OFFER_ACCEPTED, " +
+           "com.company.hr.entity.Candidate.CandidateStatus.JOINING_SCHEDULED, " +
            "com.company.hr.entity.Candidate.CandidateStatus.JOINED)")
     long countCandidatesReachedInterview();
 
@@ -109,6 +110,7 @@ public interface CandidateRepository extends JpaRepository<Candidate, Long> {
            "com.company.hr.entity.Candidate.CandidateStatus.INTERVIEW_IN_PROGRESS, " +
            "com.company.hr.entity.Candidate.CandidateStatus.OFFER_EXTENDED, " +
            "com.company.hr.entity.Candidate.CandidateStatus.OFFER_ACCEPTED, " +
+           "com.company.hr.entity.Candidate.CandidateStatus.JOINING_SCHEDULED, " +
            "com.company.hr.entity.Candidate.CandidateStatus.JOINED) " +
            "AND COALESCE(c.updatedAt, c.createdAt) >= :start AND COALESCE(c.updatedAt, c.createdAt) < :end)")
     long countCandidatesReachedInterviewInPeriod(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
@@ -151,6 +153,7 @@ public interface CandidateRepository extends JpaRepository<Candidate, Long> {
            "                  com.company.hr.entity.Candidate.CandidateStatus.INTERVIEW_IN_PROGRESS, " +
            "                  com.company.hr.entity.Candidate.CandidateStatus.OFFER_EXTENDED, " +
            "                  com.company.hr.entity.Candidate.CandidateStatus.OFFER_ACCEPTED, " +
+           "                  com.company.hr.entity.Candidate.CandidateStatus.JOINING_SCHEDULED, " +
            "                  com.company.hr.entity.Candidate.CandidateStatus.JOINED))")
     long countCandidatesReachedInterviewFilteredAllTime(
             @Param("hasDept") boolean hasDept,
@@ -167,6 +170,7 @@ public interface CandidateRepository extends JpaRepository<Candidate, Long> {
            "                      com.company.hr.entity.Candidate.CandidateStatus.INTERVIEW_IN_PROGRESS, " +
            "                      com.company.hr.entity.Candidate.CandidateStatus.OFFER_EXTENDED, " +
            "                      com.company.hr.entity.Candidate.CandidateStatus.OFFER_ACCEPTED, " +
+           "                      com.company.hr.entity.Candidate.CandidateStatus.JOINING_SCHEDULED, " +
            "                      com.company.hr.entity.Candidate.CandidateStatus.JOINED) " +
            "         AND COALESCE(c.updatedAt, c.createdAt) >= :start AND COALESCE(c.updatedAt, c.createdAt) < :end))")
     long countCandidatesReachedInterviewInPeriodFiltered(

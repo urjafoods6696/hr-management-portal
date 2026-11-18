@@ -177,7 +177,7 @@ public class Candidate {
             case SCREENING -> "Screening";
             case SHORTLISTED -> "HR Round";
             case INTERVIEW_SCHEDULED, INTERVIEW_IN_PROGRESS -> "Technical Round";
-            case OFFER_EXTENDED, OFFER_ACCEPTED -> "Offer Released";
+            case OFFER_EXTENDED, OFFER_ACCEPTED, JOINING_SCHEDULED -> "Offer Released";
             case JOINED -> "Joined";
             case REJECTED, WITHDRAWN -> "Not Selected";
         };
@@ -191,7 +191,7 @@ public class Candidate {
             case APPLIED -> "New";
             case SCREENING, SHORTLISTED -> "In Progress";
             case INTERVIEW_SCHEDULED, INTERVIEW_IN_PROGRESS -> "Interview";
-            case OFFER_EXTENDED, OFFER_ACCEPTED -> "Offer";
+            case OFFER_EXTENDED, OFFER_ACCEPTED, JOINING_SCHEDULED -> "Offer";
             case JOINED -> "Joined";
             case REJECTED, WITHDRAWN -> "Rejected";
         };
@@ -220,6 +220,7 @@ public class Candidate {
         INTERVIEW_IN_PROGRESS,
         OFFER_EXTENDED,
         OFFER_ACCEPTED,
+        JOINING_SCHEDULED,
         JOINED,
         REJECTED,
         WITHDRAWN

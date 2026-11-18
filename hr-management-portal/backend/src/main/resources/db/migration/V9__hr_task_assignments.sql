@@ -4,7 +4,6 @@
 -- ==============================================================================
 
 SET NAMES utf8mb4;
-SET FOREIGN_KEY_CHECKS = 0;
 
 -- 1. Alter recruitment_tasks table to support full recruitment task lifecycle
 ALTER TABLE recruitment_tasks MODIFY requisition_id BIGINT NULL;
@@ -85,5 +84,3 @@ INSERT INTO recruitment_tasks (requisition_id, candidate_id, assigned_user_id, a
 VALUES
 (1, NULL, 2, 2, 'Quarterly Requisition Budget & SLA Review for Tech Hiring', 'REQUISITION_REVIEW', 'Audit time-to-hire metrics, vacancy aging, and external agency spends across open tech roles.', 'Reviewing hiring funnel metrics.', '2026-10-25', '2026-10-30', 'IN_PROGRESS', 'HIGH'),
 (5, 4, 2, 2, 'Final Signoff on Financial Controller Compensation Package', 'OFFER_PROCESSING', 'Cross-check banding against company salary grid and senior management guidelines.', 'Pending VP approval.', '2026-10-26', '2026-10-29', 'ASSIGNED', 'URGENT');
-
-SET FOREIGN_KEY_CHECKS = 1;

@@ -4,7 +4,6 @@
 -- ==============================================================================
 
 SET NAMES utf8mb4;
-SET FOREIGN_KEY_CHECKS = 0;
 
 -- 1. Create Approvals Table
 CREATE TABLE IF NOT EXISTS approvals (
@@ -97,13 +96,13 @@ INSERT INTO approvals (
 ) VALUES (
     1, 'APP-2026-001', 'OFFER_APPROVAL', 'OFFER', 1,
     'Offer Approval', 'Amit Patil | Software Engineer | Pune', 'IT', 'Pune',
-    'HIGH', 'PENDING', 3, 'Sneha Shah', 'Recruiter', 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150',
+    'HIGH', 'PENDING', 3, 'Anita Deshmukh', 'Recruiter', 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150',
     '2026-10-10 10:30:00', 2, 'ROLE_HR_ADMIN',
     'Amit Patil', 'amit.patil@gmail.com', '+91 98765 43210', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
     'Software Engineer', 1, 'Selected after 2 technical rounds and managerial review for backend core API integration.',
     '2026-11-01', '2026-10-10', '2026-11-01',
     550000.00, 170000.00, 720000.00, '/documents/offers/URJ-OFF-2026-001.pdf',
-    '{"workflow": [{"step": "Offer Created", "date": "10 Oct 2026, 10:20 AM", "user": "Sneha Shah", "status": "COMPLETED"}, {"step": "Pending Approval", "date": "10 Oct 2026, 10:30 AM", "user": "Awaiting your approval", "status": "PENDING"}, {"step": "Offer Sent", "date": "Pending", "user": "", "status": "WAITING"}, {"step": "Accepted / Declined", "date": "Pending", "user": "", "status": "WAITING"}]}'
+    '{"workflow": [{"step": "Offer Created", "date": "10 Oct 2026, 10:20 AM", "user": "Anita Deshmukh", "status": "COMPLETED"}, {"step": "Pending Approval", "date": "10 Oct 2026, 10:30 AM", "user": "Awaiting your approval", "status": "PENDING"}, {"step": "Offer Sent", "date": "Pending", "user": "", "status": "WAITING"}, {"step": "Accepted / Declined", "date": "Pending", "user": "", "status": "WAITING"}]}'
 );
 
 -- Row 2: Job Requisition - JR-2026-015
@@ -116,13 +115,13 @@ INSERT INTO approvals (
 ) VALUES (
     2, 'APP-2026-002', 'REQUISITION_APPROVAL', 'REQUISITION', 25,
     'Job Requisition', 'JR-2026-015 | Plant Operator | Rahuri', 'Plant Operations', 'Rahuri',
-    'HIGH', 'PENDING', 6, 'Vikram Desai', 'Hiring Manager', 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150',
+    'HIGH', 'PENDING', 6, 'Amitav Mukherjee', 'Hiring Manager', 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150',
     '2026-10-09 16:15:00', 2, 'ROLE_HR_ADMIN',
     NULL, NULL, NULL, NULL,
     'Plant Operator', 2, 'Urgent replacement for plant expansion in solvent extraction unit 2. Requires certified boiler and silo operator.',
     '2026-11-15', NULL, NULL,
     350000.00, 50000.00, 400000.00, NULL,
-    '{"workflow": [{"step": "Requisition Submitted", "date": "09 Oct 2026, 04:10 PM", "user": "Vikram Desai", "status": "COMPLETED"}, {"step": "HR Review & Budget Approval", "date": "09 Oct 2026, 04:15 PM", "user": "Awaiting your approval", "status": "PENDING"}, {"step": "Senior Management Sanction", "date": "Pending", "user": "Siddharth Mehta (VP)", "status": "WAITING"}, {"step": "Recruiter Assignment", "date": "Pending", "user": "", "status": "WAITING"}]}'
+    '{"workflow": [{"step": "Requisition Submitted", "date": "09 Oct 2026, 04:10 PM", "user": "Amitav Mukherjee", "status": "COMPLETED"}, {"step": "HR Review & Budget Approval", "date": "09 Oct 2026, 04:15 PM", "user": "Awaiting your approval", "status": "PENDING"}, {"step": "Senior Management Sanction", "date": "Pending", "user": "Siddharth Mehta (VP)", "status": "WAITING"}, {"step": "Recruiter Assignment", "date": "Pending", "user": "", "status": "WAITING"}]}'
 );
 
 -- Row 3: Offer Approval - Neha Joshi
@@ -135,13 +134,13 @@ INSERT INTO approvals (
 ) VALUES (
     3, 'APP-2026-003', 'OFFER_APPROVAL', 'OFFER', 2,
     'Offer Approval', 'Neha Joshi | HR Executive | Mumbai', 'Human Resources', 'Mumbai',
-    'MEDIUM', 'PENDING', 4, 'Rahul More', 'Recruiter', 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
+    'MEDIUM', 'PENDING', 4, 'Rahul Nair', 'Recruiter', 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
     '2026-10-09 11:20:00', 2, 'ROLE_HR_ADMIN',
     'Neha Joshi', 'neha.joshi@gmail.com', '+91 98221 44552', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
     'HR Executive', 1, 'Final candidate selected for employee onboarding and statutory compliance handling at Mumbai Corporate Office.',
     '2026-10-25', '2026-10-09', '2026-10-25',
     600000.00, 80000.00, 680000.00, '/documents/offers/URJ-OFF-2026-002.pdf',
-    '{"workflow": [{"step": "Offer Created", "date": "09 Oct 2026, 11:10 AM", "user": "Rahul More", "status": "COMPLETED"}, {"step": "Pending Approval", "date": "09 Oct 2026, 11:20 AM", "user": "Awaiting your approval", "status": "PENDING"}, {"step": "Offer Sent", "date": "Pending", "user": "", "status": "WAITING"}, {"step": "Accepted / Declined", "date": "Pending", "user": "", "status": "WAITING"}]}'
+    '{"workflow": [{"step": "Offer Created", "date": "09 Oct 2026, 11:10 AM", "user": "Rahul Nair", "status": "COMPLETED"}, {"step": "Pending Approval", "date": "09 Oct 2026, 11:20 AM", "user": "Awaiting your approval", "status": "PENDING"}, {"step": "Offer Sent", "date": "Pending", "user": "", "status": "WAITING"}, {"step": "Accepted / Declined", "date": "Pending", "user": "", "status": "WAITING"}]}'
 );
 
 -- Row 4: Hiring Approval - QA Analyst Hiring
@@ -154,13 +153,13 @@ INSERT INTO approvals (
 ) VALUES (
     4, 'APP-2026-004', 'HIRING_APPROVAL', 'CANDIDATE', 103,
     'Hiring Approval', 'QA Analyst Hiring | Quality | Pune', 'Quality', 'Pune',
-    'MEDIUM', 'PENDING', 5, 'Anita Kulkarni', 'Department Head', 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150',
+    'MEDIUM', 'PENDING', 5, 'Rajesh Kulkarni', 'Department Head', 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150',
     '2026-10-08 14:10:00', 2, 'ROLE_HR_ADMIN',
     'Pooja Kale', 'pooja.kale@gmail.com', '+91 98221 44558', 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150',
     'QA Analyst', 1, 'Final selection approval for QA Analyst after technical assessment. Score: 4.8/5. Ready for offer generation.',
     '2026-11-05', NULL, '2026-11-05',
     480000.00, 70000.00, 550000.00, NULL,
-    '{"workflow": [{"step": "Interview Rounds Completed", "date": "08 Oct 2026, 01:30 PM", "user": "Panel Rating 4.8/5", "status": "COMPLETED"}, {"step": "HOD Hiring Recommendation", "date": "08 Oct 2026, 02:10 PM", "user": "Anita Kulkarni", "status": "COMPLETED"}, {"step": "HR Signoff", "date": "08 Oct 2026, 02:10 PM", "user": "Awaiting your approval", "status": "PENDING"}, {"step": "Offer Generation", "date": "Pending", "user": "", "status": "WAITING"}]}'
+    '{"workflow": [{"step": "Interview Rounds Completed", "date": "08 Oct 2026, 01:30 PM", "user": "Panel Rating 4.8/5", "status": "COMPLETED"}, {"step": "HOD Hiring Recommendation", "date": "08 Oct 2026, 02:10 PM", "user": "Rajesh Kulkarni", "status": "COMPLETED"}, {"step": "HR Signoff", "date": "08 Oct 2026, 02:10 PM", "user": "Awaiting your approval", "status": "PENDING"}, {"step": "Offer Generation", "date": "Pending", "user": "", "status": "WAITING"}]}'
 );
 
 -- Row 5: Offer Approval - Rahul More
@@ -173,13 +172,13 @@ INSERT INTO approvals (
 ) VALUES (
     5, 'APP-2026-005', 'OFFER_APPROVAL', 'OFFER', 4,
     'Offer Approval', 'Rahul More | Production Engineer | Shirdi', 'Production', 'Shirdi',
-    'LOW', 'PENDING', 3, 'Sneha Shah', 'Recruiter', 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150',
+    'LOW', 'PENDING', 3, 'Anita Deshmukh', 'Recruiter', 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150',
     '2026-10-07 17:40:00', 2, 'ROLE_HR_ADMIN',
     'Rahul More', 'rahul.more@gmail.com', '+91 98221 44553', 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150',
     'Production Engineer', 1, 'Selected for Shirdi Feed Mill operation and extruder shift management.',
     '2026-11-01', '2026-10-07', '2026-11-01',
     480000.00, 60000.00, 540000.00, '/documents/offers/URJ-OFF-2026-004.pdf',
-    '{"workflow": [{"step": "Offer Created", "date": "07 Oct 2026, 05:25 PM", "user": "Sneha Shah", "status": "COMPLETED"}, {"step": "Pending Approval", "date": "07 Oct 2026, 05:40 PM", "user": "Awaiting your approval", "status": "PENDING"}, {"step": "Offer Sent", "date": "Pending", "user": "", "status": "WAITING"}, {"step": "Accepted / Declined", "date": "Pending", "user": "", "status": "WAITING"}]}'
+    '{"workflow": [{"step": "Offer Created", "date": "07 Oct 2026, 05:25 PM", "user": "Anita Deshmukh", "status": "COMPLETED"}, {"step": "Pending Approval", "date": "07 Oct 2026, 05:40 PM", "user": "Awaiting your approval", "status": "PENDING"}, {"step": "Offer Sent", "date": "Pending", "user": "", "status": "WAITING"}, {"step": "Accepted / Declined", "date": "Pending", "user": "", "status": "WAITING"}]}'
 );
 
 -- Row 6: Job Requisition - JR-2026-014
@@ -211,13 +210,13 @@ INSERT INTO approvals (
 ) VALUES (
     7, 'APP-2026-007', 'OTHER_APPROVAL', 'BACKGROUND_CHECK', 105,
     'Background Check', 'Vikram Desai | Plant Operator | Rahuri', 'Operations', 'Rahuri',
-    'LOW', 'PENDING', 2, 'Priyanka Deshmukh', 'HR Executive', 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150',
+    'LOW', 'PENDING', 2, 'Priyanka Sen', 'HR Admin', 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150',
     '2026-10-06 11:50:00', 2, 'ROLE_HR_ADMIN',
     'Vikram Desai', 'vikram.desai@gmail.com', '+91 98221 44555', 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150',
     'Plant Operator', 1, 'Third-party BGV clearance report submitted by AuthBridge verification team. Educational and criminal checks verified clear. Awaiting final sign-off.',
     '2026-10-25', NULL, '2026-10-25',
     350000.00, 30000.00, 380000.00, NULL,
-    '{"workflow": [{"step": "BGV Initiated", "date": "02 Oct 2026, 10:00 AM", "user": "Priyanka Deshmukh", "status": "COMPLETED"}, {"step": "Agency Report Received", "date": "06 Oct 2026, 11:30 AM", "user": "AuthBridge Team", "status": "COMPLETED"}, {"step": "HR Signoff", "date": "06 Oct 2026, 11:50 AM", "user": "Awaiting your approval", "status": "PENDING"}, {"step": "Final Clear Gate", "date": "Pending", "user": "", "status": "WAITING"}]}'
+    '{"workflow": [{"step": "BGV Initiated", "date": "02 Oct 2026, 10:00 AM", "user": "Priyanka Sen", "status": "COMPLETED"}, {"step": "Agency Report Received", "date": "06 Oct 2026, 11:30 AM", "user": "AuthBridge Team", "status": "COMPLETED"}, {"step": "HR Signoff", "date": "06 Oct 2026, 11:50 AM", "user": "Awaiting your approval", "status": "PENDING"}, {"step": "Final Clear Gate", "date": "Pending", "user": "", "status": "WAITING"}]}'
 );
 
 -- Seed records for "Approved Today" (4 records)
@@ -229,10 +228,10 @@ INSERT INTO approvals (
     job_title, openings, justification, target_joining_date, offer_date, proposed_joining_date,
     ctc_fixed, ctc_variable, ctc_total, offer_letter_url, details_json
 ) VALUES 
-(8, 'APP-2026-008', 'OFFER_APPROVAL', 'OFFER', 6, 'Offer Approval', 'Pooja Kale | QA / QC Executive | Pune', 'Quality Assurance', 'Pune', 'HIGH', 'APPROVED', 3, 'Sneha Shah', 'Recruiter', NULL, '2026-10-26 09:15:00', 2, 'ROLE_HR_ADMIN', 2, 'Priyanka Deshmukh', '2026-10-26 10:00:00', 'Approved. Package conforms to grade Q-3 salary band.', 'Pooja Kale', 'pooja.kale@company.com', '+91 98221 44558', NULL, 'QA / QC Executive', 1, 'Replacement position approved.', '2026-11-10', '2026-10-26', '2026-11-10', 500000.00, 50000.00, 550000.00, NULL, '{"workflow": [{"step": "Offer Created", "date": "26 Oct 2026", "status": "COMPLETED"}, {"step": "Approved", "date": "26 Oct 2026", "status": "COMPLETED"}]}'),
-(9, 'APP-2026-009', 'REQUISITION_APPROVAL', 'REQUISITION', 21, 'Job Requisition', 'JR-2026-016 | Software Engineer | Pune', 'IT', 'Pune', 'HIGH', 'APPROVED', 5, 'Rajesh Kulkarni', 'Dept Head', NULL, '2026-10-26 08:30:00', 2, 'ROLE_HR_ADMIN', 2, 'Priyanka Deshmukh', '2026-10-26 09:45:00', 'Approved. Urgent backfill sanctioned.', NULL, NULL, NULL, NULL, 'Software Engineer', 1, 'Urgent backfill for cloud API migration.', '2026-11-20', NULL, NULL, 900000.00, 150000.00, 1050000.00, NULL, '{"workflow": [{"step": "Requisition Submitted", "date": "26 Oct 2026", "status": "COMPLETED"}, {"step": "Approved", "date": "26 Oct 2026", "status": "COMPLETED"}]}'),
-(10, 'APP-2026-010', 'HIRING_APPROVAL', 'CANDIDATE', 106, 'Hiring Approval', 'Kishore Pawar | Instrumentation Eng | Pune', 'Engineering', 'Pune', 'MEDIUM', 'APPROVED', 4, 'Rahul Nair', 'Recruiter', NULL, '2026-10-26 09:00:00', 2, 'ROLE_HR_ADMIN', 2, 'Priyanka Deshmukh', '2026-10-26 10:15:00', 'Technical evaluation score 4.7/5 verified. Approved.', 'Kishore Pawar', 'kishore.pawar@gmail.com', '+91 98221 44557', NULL, 'Instrumentation Eng', 1, 'SCADA implementation specialist.', '2026-11-15', NULL, '2026-11-15', 550000.00, 70000.00, 620000.00, NULL, '{"workflow": [{"step": "Hiring Recommended", "date": "26 Oct 2026", "status": "COMPLETED"}, {"step": "Approved", "date": "26 Oct 2026", "status": "COMPLETED"}]}'),
-(11, 'APP-2026-011', 'OFFER_APPROVAL', 'OFFER', 7, 'Offer Approval', 'Nitin Shinde | Mechanical Engineer | Rahuri', 'Engineering', 'Rahuri', 'MEDIUM', 'APPROVED', 3, 'Sneha Shah', 'Recruiter', NULL, '2026-10-26 08:45:00', 2, 'ROLE_HR_ADMIN', 2, 'Priyanka Deshmukh', '2026-10-26 09:30:00', 'Approved by HR Admin.', 'Nitin Shinde', 'nitin.shinde@gmail.com', '+91 98221 44551', NULL, 'Mechanical Engineer', 1, 'Boiler maintenance lead.', '2026-11-01', '2026-10-26', '2026-11-01', 650000.00, 80000.00, 730000.00, NULL, '{"workflow": [{"step": "Offer Created", "date": "26 Oct 2026", "status": "COMPLETED"}, {"step": "Approved", "date": "26 Oct 2026", "status": "COMPLETED"}]}');
+(8, 'APP-2026-008', 'OFFER_APPROVAL', 'OFFER', 6, 'Offer Approval', 'Pooja Kale | QA / QC Executive | Pune', 'Quality Assurance', 'Pune', 'HIGH', 'APPROVED', 3, 'Anita Deshmukh', 'Recruiter', NULL, '2026-10-26 09:15:00', 2, 'ROLE_HR_ADMIN', 2, 'Priyanka Sen', '2026-10-26 10:00:00', 'Approved. Package conforms to grade Q-3 salary band.', 'Pooja Kale', 'pooja.kale@company.com', '+91 98221 44558', NULL, 'QA / QC Executive', 1, 'Replacement position approved.', '2026-11-10', '2026-10-26', '2026-11-10', 500000.00, 50000.00, 550000.00, NULL, '{"workflow": [{"step": "Offer Created", "date": "26 Oct 2026", "status": "COMPLETED"}, {"step": "Approved", "date": "26 Oct 2026", "status": "COMPLETED"}]}'),
+(9, 'APP-2026-009', 'REQUISITION_APPROVAL', 'REQUISITION', 21, 'Job Requisition', 'JR-2026-016 | Software Engineer | Pune', 'IT', 'Pune', 'HIGH', 'APPROVED', 5, 'Rajesh Kulkarni', 'Dept Head', NULL, '2026-10-26 08:30:00', 2, 'ROLE_HR_ADMIN', 2, 'Priyanka Sen', '2026-10-26 09:45:00', 'Approved. Urgent backfill sanctioned.', NULL, NULL, NULL, NULL, 'Software Engineer', 1, 'Urgent backfill for cloud API migration.', '2026-11-20', NULL, NULL, 900000.00, 150000.00, 1050000.00, NULL, '{"workflow": [{"step": "Requisition Submitted", "date": "26 Oct 2026", "status": "COMPLETED"}, {"step": "Approved", "date": "26 Oct 2026", "status": "COMPLETED"}]}'),
+(10, 'APP-2026-010', 'HIRING_APPROVAL', 'CANDIDATE', 106, 'Hiring Approval', 'Kishore Pawar | Instrumentation Eng | Pune', 'Engineering', 'Pune', 'MEDIUM', 'APPROVED', 4, 'Rahul Nair', 'Recruiter', NULL, '2026-10-26 09:00:00', 2, 'ROLE_HR_ADMIN', 2, 'Priyanka Sen', '2026-10-26 10:15:00', 'Technical evaluation score 4.7/5 verified. Approved.', 'Kishore Pawar', 'kishore.pawar@gmail.com', '+91 98221 44557', NULL, 'Instrumentation Eng', 1, 'SCADA implementation specialist.', '2026-11-15', NULL, '2026-11-15', 550000.00, 70000.00, 620000.00, NULL, '{"workflow": [{"step": "Hiring Recommended", "date": "26 Oct 2026", "status": "COMPLETED"}, {"step": "Approved", "date": "26 Oct 2026", "status": "COMPLETED"}]}'),
+(11, 'APP-2026-011', 'OFFER_APPROVAL', 'OFFER', 7, 'Offer Approval', 'Nitin Shinde | Mechanical Engineer | Rahuri', 'Engineering', 'Rahuri', 'MEDIUM', 'APPROVED', 3, 'Anita Deshmukh', 'Recruiter', NULL, '2026-10-26 08:45:00', 2, 'ROLE_HR_ADMIN', 2, 'Priyanka Sen', '2026-10-26 09:30:00', 'Approved by HR Admin.', 'Nitin Shinde', 'nitin.shinde@gmail.com', '+91 98221 44551', NULL, 'Mechanical Engineer', 1, 'Boiler maintenance lead.', '2026-11-01', '2026-10-26', '2026-11-01', 650000.00, 80000.00, 730000.00, NULL, '{"workflow": [{"step": "Offer Created", "date": "26 Oct 2026", "status": "COMPLETED"}, {"step": "Approved", "date": "26 Oct 2026", "status": "COMPLETED"}]}');
 
 -- Seed records for "Rejected Today" (1 record)
 INSERT INTO approvals (
@@ -244,8 +243,8 @@ INSERT INTO approvals (
     ctc_fixed, ctc_variable, ctc_total, offer_letter_url, details_json
 ) VALUES (
     12, 'APP-2026-012', 'OFFER_APPROVAL', 'OFFER', 8, 'Offer Approval', 'Rohan Gaikwad | Shift Incharge Refinery | Pune', 'Production', 'Pune',
-    'HIGH', 'REJECTED', 3, 'Sneha Shah', 'Recruiter', NULL, '2026-10-26 09:00:00',
-    2, 'ROLE_HR_ADMIN', 2, 'Priyanka Deshmukh', '2026-10-26 10:20:00', 'Requested compensation exceeds approved budget band for Shift Incharge by 30%.',
+    'HIGH', 'REJECTED', 3, 'Anita Deshmukh', 'Recruiter', NULL, '2026-10-26 09:00:00',
+    2, 'ROLE_HR_ADMIN', 2, 'Priyanka Sen', '2026-10-26 10:20:00', 'Requested compensation exceeds approved budget band for Shift Incharge by 30%.',
     'Rohan Gaikwad', 'rohan.gaikwad@gmail.com', '+91 98221 44563', NULL,
     'Shift Incharge Refinery', 1, 'Refinery plant expansion.', '2026-11-15', '2026-10-26', '2026-11-15',
     850000.00, 150000.00, 1000000.00, NULL,
@@ -263,7 +262,7 @@ INSERT INTO approvals (
 ) VALUES (
     13, 'APP-2026-013', 'REQUISITION_APPROVAL', 'REQUISITION', 22, 'Job Requisition', 'JR-2026-017 | Territory Sales Executive | Nashik', 'Sales', 'Nashik',
     'MEDIUM', 'RETURNED', 5, 'Rajesh Kulkarni', 'Dept Head', NULL, '2026-10-24 11:00:00',
-    2, 'ROLE_HR_ADMIN', 2, 'Priyanka Deshmukh', '2026-10-25 15:30:00', 'Please clarify whether this is a replacement or new budgeted headcount before HR approval.',
+    2, 'ROLE_HR_ADMIN', 2, 'Priyanka Sen', '2026-10-25 15:30:00', 'Please clarify whether this is a replacement or new budgeted headcount before HR approval.',
     NULL, NULL, NULL, NULL,
     'Territory Sales Executive', 1, 'Expansion in Nashik territory.', '2026-11-30', NULL, NULL,
     400000.00, 60000.00, 460000.00, NULL,
@@ -272,8 +271,6 @@ INSERT INTO approvals (
 
 -- Seed initial comments
 INSERT INTO approval_comments (approval_id, user_id, user_name, user_role, comment, created_at) VALUES
-(1, 3, 'Sneha Shah', 'Recruiter', 'Candidate has accepted all preliminary compensation terms. Fast-track approval requested.', '2026-10-10 10:25:00'),
-(2, 6, 'Vikram Desai', 'Hiring Manager', 'Urgent replacement needed before next week harvest season begins.', '2026-10-09 16:12:00'),
-(4, 5, 'Anita Kulkarni', 'Department Head', 'Strong technical scores in QA automation and food safety protocols.', '2026-10-08 14:15:00');
-
-SET FOREIGN_KEY_CHECKS = 1;
+(1, 3, 'Anita Deshmukh', 'Recruiter', 'Candidate has accepted all preliminary compensation terms. Fast-track approval requested.', '2026-10-10 10:25:00'),
+(2, 6, 'Amitav Mukherjee', 'Hiring Manager', 'Urgent replacement needed before next week harvest season begins.', '2026-10-09 16:12:00'),
+(4, 5, 'Rajesh Kulkarni', 'Department Head', 'Strong technical scores in QA automation and food safety protocols.', '2026-10-08 14:15:00');

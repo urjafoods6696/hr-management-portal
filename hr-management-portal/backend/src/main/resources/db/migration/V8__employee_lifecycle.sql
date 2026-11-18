@@ -5,7 +5,6 @@
 -- ==============================================================================
 
 SET NAMES utf8mb4;
-SET FOREIGN_KEY_CHECKS = 0;
 
 -- 1. Modify employees table to add lifecycle, probation, exit and ATS recruitment fields
 ALTER TABLE employees
@@ -200,5 +199,3 @@ INSERT INTO employee_status_history (employee_id, previous_status, new_status, c
 (18, 'NOTICE_PERIOD', 'EXITED', 'Formal handover completed and no-due clearance certificates signed.', 2, 'Priyanka Deshmukh'),
 (21, 'ACTIVE', 'RESIGNATION_SUBMITTED', 'Formal resignation letter submitted via portal.', 2, 'Priyanka Deshmukh'),
 (22, 'RESIGNATION_SUBMITTED', 'NOTICE_PERIOD', '30-day notice period sanctioned by reporting manager.', 2, 'Priyanka Deshmukh');
-
-SET FOREIGN_KEY_CHECKS = 1;

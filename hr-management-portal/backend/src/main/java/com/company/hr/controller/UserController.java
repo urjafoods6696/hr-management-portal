@@ -34,12 +34,38 @@ public class UserController {
 
     @PutMapping("/me")
     @PreAuthorize("isAuthenticated()")
-    @Operation(summary = "Update authenticated user's own profile (Full Name, Phone Number, Avatar)")
+    @Operation(summary = "Update authenticated user's own profile (Full Name, Phone Number, Avatar, Username, Email, Department, Role)")
     public ResponseEntity<ApiResponse<UserResponseDto>> updateCurrentUserProfile(
             @AuthenticationPrincipal UserPrincipal currentUser,
             @Valid @RequestBody UserProfileUpdateRequest request) {
         UserResponseDto profile = userService.updateCurrentUserProfile(currentUser, request);
         return ResponseEntity.ok(ApiResponse.ok(profile, "Profile updated successfully."));
+    }
+
+    @PostMapping(value = "/me/avatar", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Upload authenticated user profile avatar image from device")
+    public ResponseEntity<ApiResponse<UserResponseDto>> uploadCurrentUserAvatar(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) throws java.io.IOException {
+        UserResponseDto profile = userService.uploadUserProfileAvatar(currentUser, file);
+        return ResponseEntity.ok(ApiResponse.ok(profile, "Profile avatar updated successfully."));
+    }
+
+    @GetMapping("/avatar/{fileName:.+}")
+    @Operation(summary = "Serve uploaded profile avatar image")
+    public ResponseEntity<org.springframework.core.io.Resource> getAvatar(
+            @PathVariable String fileName) throws java.io.IOException {
+        org.springframework.core.io.Resource resource = userService.getAvatarResource(fileName);
+        String ext = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
+        org.springframework.http.MediaType mediaType = org.springframework.http.MediaType.IMAGE_JPEG;
+        if (ext.equals(".png")) mediaType = org.springframework.http.MediaType.IMAGE_PNG;
+        else if (ext.equals(".webp")) mediaType = org.springframework.http.MediaType.parseMediaType("image/webp");
+
+        return ResponseEntity.ok()
+                .contentType(mediaType)
+                .header(org.springframework.http.HttpHeaders.CACHE_CONTROL, "public, max-age=604800")
+                .body(resource);
     }
 
     @PatchMapping("/{id}/deactivate")

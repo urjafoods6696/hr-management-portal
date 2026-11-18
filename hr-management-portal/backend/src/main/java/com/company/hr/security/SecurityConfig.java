@@ -102,6 +102,8 @@ public class SecurityConfig {
                                 "/api/v1/auth/reset-password",
                                 "/api/v1/auth/admin-password/**",
                                 "/api/auth/admin-password/**",
+                                "/api/v1/users/avatar/**",
+                                "/api/users/avatar/**",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
@@ -110,7 +112,11 @@ public class SecurityConfig {
                         .permitAll()
 
                         // Current authenticated user's own profile endpoints (All HTTP Methods for all authenticated roles)
-                        .requestMatchers("/api/users/me", "/api/v1/users/me", "/api/auth/me", "/api/v1/auth/me").authenticated()
+                        .requestMatchers(
+                                "/api/users/me", "/api/users/me/**",
+                                "/api/v1/users/me", "/api/v1/users/me/**",
+                                "/api/auth/me", "/api/auth/me/**",
+                                "/api/v1/auth/me", "/api/v1/auth/me/**").authenticated()
 
                         // Admin specific endpoints
                         .requestMatchers("/api/v1/admin/**", "/api/users/**", "/api/v1/users/**").hasAnyRole("IT_ADMIN", "HR_ADMIN")

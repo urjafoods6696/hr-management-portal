@@ -297,6 +297,25 @@ export const userService = {
       localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(merged));
     } catch (e) { }
     return updated;
+  },
+
+  async uploadAvatar(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post('/api/v1/users/me/avatar', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+    const body = response.data;
+    const updated = body.data || body;
+    try {
+      const currentStored = getStoredUser() || {};
+      const merged = { ...currentStored, ...updated };
+      sessionStorage.setItem(USER_STORAGE_KEY, JSON.stringify(merged));
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(merged));
+    } catch (e) { }
+    return updated;
   }
 };
 
@@ -324,6 +343,25 @@ export const authService = {
 
   async updateCurrentUserProfile(profileData) {
     const response = await api.put('/api/v1/auth/me', profileData);
+    const body = response.data;
+    const updated = body.data || body;
+    try {
+      const currentStored = getStoredUser() || {};
+      const merged = { ...currentStored, ...updated };
+      sessionStorage.setItem(USER_STORAGE_KEY, JSON.stringify(merged));
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(merged));
+    } catch (e) { }
+    return updated;
+  },
+
+  async uploadAvatar(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post('/api/v1/auth/me/avatar', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
     const body = response.data;
     const updated = body.data || body;
     try {

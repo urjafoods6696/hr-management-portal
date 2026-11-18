@@ -1,17 +1,56 @@
-import React, { useState, useEffect } from 'react';
-import { authService } from '../services/api';
+import React, { useState, useEffect, useRef } from 'react';
+import { authService, API_BASE_URL } from '../services/api';
 
 const BASE = (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL) || '/';
 const cleanBase = BASE.endsWith('/') ? BASE : `${BASE}/`;
 
-const PRESET_AVATARS = [
-  { id: 'woman', label: 'Corporate Lead (F)', url: `${cleanBase}assets/images/woman.jpg` },
-  { id: 'man', label: 'Corporate Lead (M)', url: `${cleanBase}assets/images/man.jpg` },
-  { id: 'neha', label: 'Professional Neha', url: `${cleanBase}assets/images/cand_neha.jpg` },
-  { id: 'amit', label: 'Executive Amit', url: `${cleanBase}assets/images/cand_amit.jpg` },
-  { id: 'sneha', label: 'Specialist Sneha', url: `${cleanBase}assets/images/cand_sneha.jpg` },
-  { id: 'vikram', label: 'Manager Vikram', url: `${cleanBase}assets/images/cand_vikram.jpg` }
+// Recognized organizational departments in ATS Urja
+const DEPARTMENTS = [
+  { id: 1, name: 'Engineering & Technology', code: 'DEP-ENG' },
+  { id: 2, name: 'Global Sales & Enterprise BD', code: 'DEP-SALES' },
+  { id: 3, name: 'Human Resources & Talent Acquisition', code: 'DEP-HR' },
+  { id: 4, name: 'Finance, Tax & Accounts', code: 'DEP-FIN' },
+  { id: 5, name: 'Operations & Supply Chain', code: 'DEP-OPS' },
+  { id: 6, name: 'Brand Marketing & Communications', code: 'DEP-MKT' }
 ];
+
+// Recognized organizational roles in ATS Urja
+const ROLES = [
+  { code: 'ROLE_IT_ADMIN', label: 'IT Administrator' },
+  { code: 'ROLE_HR_ADMIN', label: 'HR Administrator' },
+  { code: 'ROLE_HR_RECRUITER', label: 'Senior Technical Recruiter' },
+  { code: 'ROLE_DEPT_HEAD', label: 'Department Head' },
+  { code: 'ROLE_APPROVING_MANAGER', label: 'Approving Manager' },
+  { code: 'ROLE_SENIOR_MGMT', label: 'Senior Leadership / VP' },
+  { code: 'ROLE_INTERVIEWER', label: 'Technical Lead / Interviewer' },
+  { code: 'ROLE_EMPLOYEE', label: 'Standard Employee' }
+];
+
+/**
+ * Safely resolves avatar URLs:
+ * - blob: and data: URLs (local client previews)
+ * - absolute http/https URLs
+ * - backend relative URLs (/api/v1/users/avatar/...)
+ * - fallback static assets
+ */
+function resolveAvatarUrl(url, fallbackRole) {
+  if (!url) {
+    return fallbackRole === 'ROLE_DEPT_HEAD'
+      ? `${cleanBase}assets/images/man.jpg`
+      : `${cleanBase}assets/images/woman.jpg`;
+  }
+  if (url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  if (url.startsWith('/api/')) {
+    const base = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+    return `${base}${url}`;
+  }
+  if (url.startsWith('/assets/')) {
+    return `${cleanBase}${url.slice(1)}`;
+  }
+  return url;
+}
 
 export default function UserProfileModal({
   isOpen,
@@ -28,26 +67,35 @@ export default function UserProfileModal({
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
+  // Device Avatar Upload States
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const fileInputRef = useRef(null);
+
   // Form Edit State
   const [editName, setEditName] = useState('');
   const [editPhone, setEditPhone] = useState('');
-  const [editAvatar, setEditAvatar] = useState('');
-  const [customAvatarUrl, setCustomAvatarUrl] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editUsername, setEditUsername] = useState('');
+  const [editDepartmentId, setEditDepartmentId] = useState(3);
+  const [editDepartment, setEditDepartment] = useState('Human Resources & Talent Acquisition');
+  const [editRole, setEditRole] = useState('ROLE_HR_ADMIN');
 
+  const user = profileData || currentUser || {};
+  const isPrivilegedAdmin = user.role === 'ROLE_IT_ADMIN' || user.role === 'ROLE_HR_ADMIN' ||
+    (Array.isArray(user.roles) && (user.roles.includes('ROLE_IT_ADMIN') || user.roles.includes('ROLE_HR_ADMIN')));
+
+  // Populate state whenever modal opens or user data changes
   useEffect(() => {
     if (isOpen) {
       setProfileData(currentUser);
       setIsEditing(false);
       setErrorMessage('');
       setSuccessMessage('');
-      
-      const initialName = currentUser?.name || '';
-      const initialPhone = currentUser?.phoneNumber || '';
-      const initialAvatar = currentUser?.profileImageUrl || currentUser?.avatar || '/assets/images/woman.jpg';
-      setEditName(initialName);
-      setEditPhone(initialPhone);
-      setEditAvatar(initialAvatar);
-      setCustomAvatarUrl('');
+      setSelectedFile(null);
+      setPreviewUrl(null);
+
+      syncFormFields(currentUser);
 
       // Fetch freshest profile from backend
       setIsLoading(true);
@@ -55,10 +103,7 @@ export default function UserProfileModal({
         .then((res) => {
           if (res) {
             setProfileData(res);
-            setEditName(res.name || initialName);
-            setEditPhone(res.phoneNumber || initialPhone);
-            const freshAvatar = res.profileImageUrl || res.avatar || initialAvatar;
-            setEditAvatar(freshAvatar);
+            syncFormFields(res);
           }
         })
         .catch(() => {})
@@ -66,11 +111,34 @@ export default function UserProfileModal({
     }
   }, [isOpen, currentUser]);
 
-  if (!isOpen) return null;
+  // Clean up object URL when unmounting or changing preview
+  useEffect(() => {
+    return () => {
+      if (previewUrl && previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
 
-  const user = profileData || currentUser || {};
-  const isPrivilegedAdmin = user.role === 'ROLE_IT_ADMIN' || user.role === 'ROLE_HR_ADMIN' || 
-    (Array.isArray(user.roles) && (user.roles.includes('ROLE_IT_ADMIN') || user.roles.includes('ROLE_HR_ADMIN')));
+  const syncFormFields = (data) => {
+    if (!data) return;
+    setEditName(data.name || '');
+    setEditPhone(data.phoneNumber || '');
+    setEditEmail(data.email || '');
+    setEditUsername(data.username || '');
+
+    // Map department
+    const deptId = data.departmentId || data.departmentRestrictionId || 3;
+    setEditDepartmentId(deptId);
+    const matchedDept = DEPARTMENTS.find(d => d.id === deptId) || DEPARTMENTS.find(d => d.name === data.department);
+    setEditDepartment(matchedDept ? matchedDept.name : (data.department || 'Human Resources & Talent Acquisition'));
+
+    // Map role
+    const primaryRole = data.role || (Array.isArray(data.roles) && data.roles[0]) || 'ROLE_HR_ADMIN';
+    setEditRole(primaryRole);
+  };
+
+  if (!isOpen) return null;
 
   const getRoleBadge = (roleName) => {
     switch (roleName) {
@@ -79,58 +147,145 @@ export default function UserProfileModal({
       case 'ROLE_HR_ADMIN':
         return { label: 'HR Administrator', bg: '#F0FDF4', color: '#15803D', border: '#BBF7D0' };
       case 'ROLE_HR_RECRUITER':
-        return { label: 'HR Recruiter', bg: '#FDF4FF', color: '#86198F', border: '#F5D0FE' };
+        return { label: 'Senior Technical Recruiter', bg: '#FDF4FF', color: '#86198F', border: '#F5D0FE' };
       case 'ROLE_DEPT_HEAD':
         return { label: 'Department Head', bg: '#FFFBEB', color: '#B45309', border: '#FDE68A' };
       case 'ROLE_APPROVING_MANAGER':
         return { label: 'Approving Manager', bg: '#F8FAFC', color: '#334155', border: '#CBD5E1' };
+      case 'ROLE_SENIOR_MGMT':
+        return { label: 'Senior Leadership / VP', bg: '#FDF2F8', color: '#9D174D', border: '#FBCFE8' };
+      case 'ROLE_INTERVIEWER':
+        return { label: 'Technical Lead / Interviewer', bg: '#F0FDF4', color: '#166534', border: '#BBF7D0' };
       default:
-        return { label: user.title || 'Team Member', bg: '#F0FDF4', color: '#16A34A', border: '#BBF7D0' };
+        return { label: user.title || 'Standard Employee', bg: '#F0FDF4', color: '#16A34A', border: '#BBF7D0' };
     }
   };
 
   const roleBadge = getRoleBadge(user.role || (Array.isArray(user.roles) ? user.roles[0] : ''));
 
   const handleStartEdit = () => {
-    setEditName(user.name || '');
-    setEditPhone(user.phoneNumber || '');
-    const currentImg = user.profileImageUrl || user.avatar || '/assets/images/woman.jpg';
-    setEditAvatar(currentImg);
+    syncFormFields(user);
     setErrorMessage('');
     setSuccessMessage('');
     setIsEditing(true);
   };
 
   const handleCancelEdit = () => {
-    setIsEditing(false);
+    if (previewUrl && previewUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    setSelectedFile(null);
+    setPreviewUrl(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+
+    syncFormFields(user);
     setErrorMessage('');
-    setEditName(user.name || '');
-    setEditPhone(user.phoneNumber || '');
-    setEditAvatar(user.profileImageUrl || user.avatar || '/assets/images/woman.jpg');
+    setIsEditing(false);
+  };
+
+  /**
+   * Native device image picker selection handler
+   */
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setErrorMessage('');
+    setSuccessMessage('');
+
+    // 1. Validate File Size (Maximum 5 MB)
+    const maxSizeBytes = 5 * 1024 * 1024;
+    if (file.size > maxSizeBytes) {
+      setErrorMessage('File size exceeds 5MB limit. Please choose a smaller image (under 5MB).');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    // 2. Validate Image File Type (JPG, JPEG, PNG, WEBP)
+    const validMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    const validExtensions = ['.jpg', '.jpeg', '.png', '.webp'];
+    const fileNameLower = file.name.toLowerCase();
+    const hasValidExt = validExtensions.some(ext => fileNameLower.endsWith(ext));
+    const hasValidMime = validMimes.includes(file.type.toLowerCase()) || (file.type === '' && hasValidExt);
+
+    if (!hasValidMime && !hasValidExt) {
+      setErrorMessage('Invalid file format. Please select a JPG, JPEG, PNG, or WEBP image.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    // Revoke previous blob if any
+    if (previewUrl && previewUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(previewUrl);
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    setSelectedFile(file);
+    setPreviewUrl(objectUrl);
+    setIsEditing(true); // Automatically ensure editing mode is active
   };
 
   const handleSaveProfile = async (e) => {
     if (e) e.preventDefault();
+    setErrorMessage('');
+    setSuccessMessage('');
+
+    // Field Validation
     if (!editName || editName.trim().length < 2) {
       setErrorMessage('Full name is required (minimum 2 characters).');
       return;
     }
 
+    if (isPrivilegedAdmin) {
+      if (!editEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editEmail.trim())) {
+        setErrorMessage('Please enter a valid official work email address.');
+        return;
+      }
+
+      const cleanUser = editUsername.trim().replace(/^@/, '');
+      if (!cleanUser || cleanUser.length < 3) {
+        setErrorMessage('Username must be at least 3 characters long.');
+        return;
+      }
+    }
+
     setIsSaving(true);
-    setErrorMessage('');
-    setSuccessMessage('');
 
     try {
+      let finalAvatarUrl = user.profileImageUrl || user.avatar;
+
+      // 1. Upload device image if a new one was selected
+      if (selectedFile) {
+        const uploadRes = await authService.uploadAvatar(selectedFile);
+        if (uploadRes && uploadRes.profileImageUrl) {
+          finalAvatarUrl = uploadRes.profileImageUrl;
+        }
+        if (previewUrl && previewUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(previewUrl);
+        }
+        setSelectedFile(null);
+        setPreviewUrl(null);
+      }
+
+      // 2. Update user profile fields
       const payload = {
         name: editName.trim(),
         phoneNumber: editPhone ? editPhone.trim() : '',
-        profileImageUrl: customAvatarUrl.trim() ? customAvatarUrl.trim() : editAvatar
+        profileImageUrl: finalAvatarUrl
       };
+
+      if (isPrivilegedAdmin) {
+        payload.email = editEmail.trim().toLowerCase();
+        payload.username = editUsername.trim().replace(/^@/, '');
+        payload.departmentId = Number(editDepartmentId);
+        payload.department = editDepartment;
+        payload.role = editRole;
+      }
 
       const updated = await authService.updateCurrentUserProfile(payload);
       setIsSaving(false);
       setProfileData(updated);
-      setSuccessMessage('Profile updated successfully!');
+      setSuccessMessage('Profile and account details updated successfully!');
       setIsEditing(false);
 
       if (onProfileUpdated) {
@@ -138,27 +293,30 @@ export default function UserProfileModal({
       }
     } catch (err) {
       setIsSaving(false);
-      const msg = err.response?.data?.message || err.message || 'Failed to update user profile.';
+      const msg = err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to update user profile.';
       setErrorMessage(msg);
     }
   };
 
+  // Currently displayed image
+  const displayImageSrc = previewUrl || resolveAvatarUrl(user.profileImageUrl || user.avatar, user.role);
+
   return (
     <div className="urja-modal-backdrop" onClick={onClose} style={{ zIndex: 1050 }}>
-      <div 
-        className="urja-modal-box-white" 
-        style={{ maxWidth: '640px', width: '92%', borderRadius: '16px', overflow: 'hidden', padding: 0 }}
+      <div
+        className="urja-modal-box-white"
+        style={{ maxWidth: '680px', width: '94%', borderRadius: '18px', overflow: 'hidden', padding: 0, boxShadow: '0 25px 60px rgba(0,0,0,0.3)' }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Banner Header */}
+        {/* Banner Header with Circular Avatar & Device Upload Pencil */}
         <div style={{
           background: 'linear-gradient(135deg, #15803D 0%, #16A34A 100%)',
           padding: '24px 28px',
           color: '#FFFFFF',
           position: 'relative'
         }}>
-          <button 
-            type="button" 
+          <button
+            type="button"
             id="closeProfileModalTopBtn"
             onClick={onClose}
             aria-label="Close"
@@ -183,43 +341,104 @@ export default function UserProfileModal({
             ✕
           </button>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div style={{ position: 'relative' }}>
-              <img 
-                src={(isEditing ? (customAvatarUrl || editAvatar) : (user.profileImageUrl || user.avatar)) || (user.role === 'ROLE_DEPT_HEAD' ? `${cleanBase}assets/images/man.jpg` : `${cleanBase}assets/images/woman.jpg`)}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
+            {/* Circular Profile Avatar with Pencil Upload Button Overlay */}
+            <div style={{ position: 'relative', width: '82px', height: '82px', flexShrink: 0 }}>
+              <img
+                src={displayImageSrc}
                 alt={user.name || 'User'}
                 style={{
-                  width: '68px',
-                  height: '68px',
+                  width: '82px',
+                  height: '82px',
                   borderRadius: '50%',
                   objectFit: 'cover',
                   border: '3px solid #FFFFFF',
-                  boxShadow: '0 4px 10px rgba(0,0,0,0.15)'
+                  boxShadow: '0 4px 14px rgba(0,0,0,0.2)',
+                  backgroundColor: '#E2E8F0',
+                  display: 'block'
                 }}
-                onError={(e) => { 
+                onError={(e) => {
                   e.target.onerror = null;
-                  e.target.src = user.role === 'ROLE_DEPT_HEAD' ? `${cleanBase}assets/images/man.jpg` : `${cleanBase}assets/images/woman.jpg`; 
+                  e.target.src = user.role === 'ROLE_DEPT_HEAD'
+                    ? `${cleanBase}assets/images/man.jpg`
+                    : `${cleanBase}assets/images/woman.jpg`;
                 }}
               />
-              <span style={{
-                position: 'absolute',
-                bottom: '2px',
-                right: '2px',
-                width: '14px',
-                height: '14px',
-                backgroundColor: '#22c55e',
-                border: '2px solid #FFFFFF',
-                borderRadius: '50%'
-              }} title="Online Active Session"></span>
+
+              {/* Online indicator (shown when not editing) */}
+              {!isEditing && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    bottom: '2px',
+                    right: '2px',
+                    width: '14px',
+                    height: '14px',
+                    backgroundColor: '#22c55e',
+                    border: '2px solid #FFFFFF',
+                    borderRadius: '50%'
+                  }}
+                  title="Online Active Session"
+                ></span>
+              )}
+
+              {/* Native Device File Upload Trigger (Pencil Icon Overlay) */}
+              <button
+                type="button"
+                id="profileImageUploadPencilBtn"
+                onClick={() => fileInputRef.current?.click()}
+                title="Upload image from device (JPG, JPEG, PNG, WEBP up to 5MB)"
+                aria-label="Upload profile image"
+                style={{
+                  position: 'absolute',
+                  bottom: '-2px',
+                  right: '-2px',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  backgroundColor: '#15803D',
+                  color: '#FFFFFF',
+                  border: '2px solid #FFFFFF',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  padding: 0,
+                  transition: 'all 0.15s ease-in-out',
+                  zIndex: 3
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#0F5132';
+                  e.currentTarget.style.transform = 'scale(1.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#15803D';
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+              >
+                <i className="bi bi-pencil-fill" style={{ fontSize: '0.82rem' }}></i>
+              </button>
+
+              {/* Hidden native file input */}
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+                accept="image/jpeg,image/png,image/webp,image/jpg"
+                style={{ display: 'none' }}
+              />
             </div>
 
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '1px', opacity: 0.85, fontWeight: 700 }}>
-                {isEditing ? 'Editing Personal Details' : 'ATS URJA • User Identity'}
+            {/* Profile Identity Title */}
+            <div style={{ flex: 1, minWidth: '220px' }}>
+              <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px', opacity: 0.9, fontWeight: 700 }}>
+                {isEditing ? 'Editing Profile & Identity' : 'ATS URJA • User Identity'}
               </div>
-              <h3 style={{ margin: '2px 0 4px 0', fontSize: '1.35rem', fontWeight: 800 }}>
+              <h3 style={{ margin: '2px 0 6px 0', fontSize: '1.4rem', fontWeight: 800 }}>
                 {isEditing ? (editName || 'User Name') : (user.name || 'Administrator')}
               </h3>
+
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                 <span style={{
                   background: 'rgba(255,255,255,0.25)',
@@ -229,8 +448,9 @@ export default function UserProfileModal({
                   fontSize: '0.75rem',
                   fontWeight: 600
                 }}>
-                  {user.designation || user.title || 'Talent Acquisition Lead'}
+                  {roleBadge.label}
                 </span>
+
                 <span style={{
                   background: '#FFFFFF',
                   color: '#15803D',
@@ -241,6 +461,22 @@ export default function UserProfileModal({
                 }}>
                   ● {user.status || 'ACTIVE'}
                 </span>
+
+                {selectedFile && (
+                  <span style={{
+                    background: '#FEF08A',
+                    color: '#854D0E',
+                    padding: '2px 10px',
+                    borderRadius: '999px',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    <i className="bi bi-image"></i> New photo selected
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -338,7 +574,7 @@ export default function UserProfileModal({
               {/* Quick Info Grid */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
                 gap: '14px',
                 marginBottom: '22px'
               }}>
@@ -374,7 +610,7 @@ export default function UserProfileModal({
                     Contact Phone Number
                   </div>
                   <div style={{ fontSize: '0.92rem', fontWeight: 600, color: '#0F172A', marginTop: '2px' }}>
-                    {user.phoneNumber || '+91 98200 22334'}
+                    {user.phoneNumber || '+91 98200 99999'}
                   </div>
                 </div>
 
@@ -389,10 +625,10 @@ export default function UserProfileModal({
 
                 <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '12px 16px' }}>
                   <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#64748B', fontWeight: 700, letterSpacing: '0.5px' }}>
-                    Designation & Role
+                    Role & Authority Level
                   </div>
                   <div style={{ fontSize: '0.92rem', fontWeight: 600, color: '#0F172A', marginTop: '2px' }}>
-                    {user.designation || user.title || 'Talent Acquisition Lead'} • {roleBadge.label}
+                    {roleBadge.label}
                   </div>
                 </div>
               </div>
@@ -416,7 +652,7 @@ export default function UserProfileModal({
                       </strong>
                     </div>
                     <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#15803D', lineHeight: 1.4 }}>
-                      {isPrivilegedAdmin 
+                      {isPrivilegedAdmin
                         ? 'Administrative passwords require two-factor verification via your registered email OTP.'
                         : 'Your account is secured with JWT authentication and enterprise role-based authorization.'}
                     </p>
@@ -457,7 +693,7 @@ export default function UserProfileModal({
             </>
           ) : (
             /* =========================================================================
-               EDIT MODE (Available to ALL Users)
+               EDIT MODE (All Profile Fields Editable + Device Upload)
                ========================================================================= */
             <form onSubmit={handleSaveProfile}>
               <div style={{
@@ -470,97 +706,60 @@ export default function UserProfileModal({
               }}>
                 <div>
                   <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#0F172A' }}>
-                    Edit Your Profile Information
+                    Edit Profile Information
                   </h4>
                   <span style={{ fontSize: '0.78rem', color: '#64748B' }}>
-                    Update your full name, phone number, and profile avatar
+                    Click pencil icon on avatar to upload photo; update fields below
                   </span>
                 </div>
 
-                <span style={{
-                  background: '#EFF6FF',
-                  color: '#2563EB',
-                  border: '1px solid #BFDBFE',
-                  padding: '4px 10px',
-                  borderRadius: '999px',
-                  fontSize: '0.75rem',
-                  fontWeight: 700
-                }}>
-                  Editing Mode Active
-                </span>
-              </div>
-
-              {/* Avatar Picker Section */}
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '8px' }}>
-                  Choose Your Profile Avatar
-                </label>
-                
-                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '12px' }}>
-                  {PRESET_AVATARS.map((av) => (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {selectedFile && (
                     <button
-                      key={av.id}
                       type="button"
                       onClick={() => {
-                        setEditAvatar(av.url);
-                        setCustomAvatarUrl('');
+                        if (previewUrl && previewUrl.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
+                        setSelectedFile(null);
+                        setPreviewUrl(null);
+                        if (fileInputRef.current) fileInputRef.current.value = '';
                       }}
                       style={{
-                        background: editAvatar === av.url && !customAvatarUrl ? '#DCFCE7' : '#FFFFFF',
-                        border: editAvatar === av.url && !customAvatarUrl ? '2px solid #16A34A' : '1px solid #CBD5E1',
-                        borderRadius: '10px',
-                        padding: '6px 10px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s'
+                        background: '#F1F5F9',
+                        color: '#475569',
+                        border: '1px solid #CBD5E1',
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        cursor: 'pointer'
                       }}
                     >
-                      <img 
-                        src={av.url} 
-                        alt={av.label} 
-                        style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }}
-                      />
-                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#1E293B' }}>
-                        {av.label}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <input
-                    type="url"
-                    placeholder="Or enter custom image URL (e.g. https://...)"
-                    value={customAvatarUrl}
-                    onChange={(e) => {
-                      setCustomAvatarUrl(e.target.value);
-                      if (e.target.value) setEditAvatar(e.target.value);
-                    }}
-                    style={{
-                      flex: 1,
-                      padding: '8px 12px',
-                      fontSize: '0.82rem',
-                      borderRadius: '8px',
-                      border: '1px solid #CBD5E1',
-                      background: '#F8FAFC'
-                    }}
-                  />
-                  {customAvatarUrl && (
-                    <button
-                      type="button"
-                      onClick={() => setCustomAvatarUrl('')}
-                      style={{ background: 'none', border: 'none', color: '#64748B', cursor: 'pointer', fontSize: '0.8rem' }}
-                    >
-                      Clear
+                      Revert Photo
                     </button>
                   )}
+
+                  <span style={{
+                    background: '#EFF6FF',
+                    color: '#2563EB',
+                    border: '1px solid #BFDBFE',
+                    padding: '4px 10px',
+                    borderRadius: '999px',
+                    fontSize: '0.75rem',
+                    fontWeight: 700
+                  }}>
+                    Editing Active
+                  </span>
                 </div>
               </div>
 
-              {/* Editable Fields */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '20px' }}>
+              {/* All 6 Profile Fields in Clean Responsive Form Grid */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                gap: '16px',
+                marginBottom: '20px'
+              }}>
+                {/* 1. Full Name */}
                 <div>
                   <label htmlFor="editProfileName" style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
                     Full Name <span style={{ color: '#DC2626' }}>*</span>
@@ -571,7 +770,7 @@ export default function UserProfileModal({
                     required
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    placeholder="Enter your full name"
+                    placeholder="Enter full name"
                     style={{
                       width: '100%',
                       padding: '9px 14px',
@@ -586,6 +785,7 @@ export default function UserProfileModal({
                   />
                 </div>
 
+                {/* 2. Contact Phone Number */}
                 <div>
                   <label htmlFor="editProfilePhone" style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
                     Contact Phone Number
@@ -595,7 +795,7 @@ export default function UserProfileModal({
                     type="tel"
                     value={editPhone}
                     onChange={(e) => setEditPhone(e.target.value)}
-                    placeholder="e.g. +91 98200 22334"
+                    placeholder="+91 98200 99999"
                     style={{
                       width: '100%',
                       padding: '9px 14px',
@@ -609,26 +809,194 @@ export default function UserProfileModal({
                     onBlur={(e) => { e.target.style.borderColor = '#CBD5E1'; }}
                   />
                 </div>
+
+                {/* 3. Official Work Email */}
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <label htmlFor="editProfileEmail" style={{ fontSize: '0.82rem', fontWeight: 700, color: '#334155', margin: 0 }}>
+                      Official Work Email <span style={{ color: '#DC2626' }}>*</span>
+                    </label>
+                    {!isPrivilegedAdmin && (
+                      <span style={{ fontSize: '0.7rem', color: '#64748B', background: '#F1F5F9', padding: '1px 6px', borderRadius: '4px' }}>
+                        <i className="bi bi-lock-fill me-1"></i>Admin Only
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    id="editProfileEmail"
+                    type="email"
+                    required
+                    disabled={!isPrivilegedAdmin}
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                    placeholder="name@urjafoods.net"
+                    style={{
+                      width: '100%',
+                      padding: '9px 14px',
+                      fontSize: '0.88rem',
+                      borderRadius: '8px',
+                      border: '1px solid #CBD5E1',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                      backgroundColor: !isPrivilegedAdmin ? '#F8FAFC' : '#FFFFFF',
+                      cursor: !isPrivilegedAdmin ? 'not-allowed' : 'text'
+                    }}
+                    onFocus={(e) => { if (isPrivilegedAdmin) e.target.style.borderColor = '#16A34A'; }}
+                    onBlur={(e) => { e.target.style.borderColor = '#CBD5E1'; }}
+                  />
+                </div>
+
+                {/* 4. Username / Login ID */}
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <label htmlFor="editProfileUsername" style={{ fontSize: '0.82rem', fontWeight: 700, color: '#334155', margin: 0 }}>
+                      Username / Login ID <span style={{ color: '#DC2626' }}>*</span>
+                    </label>
+                    {!isPrivilegedAdmin && (
+                      <span style={{ fontSize: '0.7rem', color: '#64748B', background: '#F1F5F9', padding: '1px 6px', borderRadius: '4px' }}>
+                        <i className="bi bi-lock-fill me-1"></i>Admin Only
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ position: 'relative' }}>
+                    <span style={{
+                      position: 'absolute',
+                      left: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      color: '#94A3B8',
+                      fontWeight: 700,
+                      fontSize: '0.88rem'
+                    }}>
+                      @
+                    </span>
+                    <input
+                      id="editProfileUsername"
+                      type="text"
+                      required
+                      disabled={!isPrivilegedAdmin}
+                      value={editUsername}
+                      onChange={(e) => setEditUsername(e.target.value.replace(/^@/, ''))}
+                      placeholder="username"
+                      style={{
+                        width: '100%',
+                        padding: '9px 14px 9px 28px',
+                        fontSize: '0.88rem',
+                        borderRadius: '8px',
+                        border: '1px solid #CBD5E1',
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                        backgroundColor: !isPrivilegedAdmin ? '#F8FAFC' : '#FFFFFF',
+                        cursor: !isPrivilegedAdmin ? 'not-allowed' : 'text'
+                      }}
+                      onFocus={(e) => { if (isPrivilegedAdmin) e.target.style.borderColor = '#16A34A'; }}
+                      onBlur={(e) => { e.target.style.borderColor = '#CBD5E1'; }}
+                    />
+                  </div>
+                </div>
+
+                {/* 5. Assigned Department Dropdown */}
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <label htmlFor="editProfileDepartment" style={{ fontSize: '0.82rem', fontWeight: 700, color: '#334155', margin: 0 }}>
+                      Assigned Department <span style={{ color: '#DC2626' }}>*</span>
+                    </label>
+                    {!isPrivilegedAdmin && (
+                      <span style={{ fontSize: '0.7rem', color: '#64748B', background: '#F1F5F9', padding: '1px 6px', borderRadius: '4px' }}>
+                        <i className="bi bi-lock-fill me-1"></i>Admin Only
+                      </span>
+                    )}
+                  </div>
+                  <select
+                    id="editProfileDepartment"
+                    disabled={!isPrivilegedAdmin}
+                    value={editDepartmentId}
+                    onChange={(e) => {
+                      const id = Number(e.target.value);
+                      setEditDepartmentId(id);
+                      const matched = DEPARTMENTS.find(d => d.id === id);
+                      if (matched) setEditDepartment(matched.name);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '9px 14px',
+                      fontSize: '0.88rem',
+                      borderRadius: '8px',
+                      border: '1px solid #CBD5E1',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                      backgroundColor: !isPrivilegedAdmin ? '#F8FAFC' : '#FFFFFF',
+                      cursor: !isPrivilegedAdmin ? 'not-allowed' : 'pointer'
+                    }}
+                    onFocus={(e) => { if (isPrivilegedAdmin) e.target.style.borderColor = '#16A34A'; }}
+                    onBlur={(e) => { e.target.style.borderColor = '#CBD5E1'; }}
+                  >
+                    {DEPARTMENTS.map((dept) => (
+                      <option key={dept.id} value={dept.id}>
+                        {dept.name} ({dept.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 6. Role & Authority Level Dropdown */}
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <label htmlFor="editProfileRole" style={{ fontSize: '0.82rem', fontWeight: 700, color: '#334155', margin: 0 }}>
+                      Role & Authority Level <span style={{ color: '#DC2626' }}>*</span>
+                    </label>
+                    {!isPrivilegedAdmin && (
+                      <span style={{ fontSize: '0.7rem', color: '#64748B', background: '#F1F5F9', padding: '1px 6px', borderRadius: '4px' }}>
+                        <i className="bi bi-lock-fill me-1"></i>Admin Only
+                      </span>
+                    )}
+                  </div>
+                  <select
+                    id="editProfileRole"
+                    disabled={!isPrivilegedAdmin}
+                    value={editRole}
+                    onChange={(e) => setEditRole(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '9px 14px',
+                      fontSize: '0.88rem',
+                      borderRadius: '8px',
+                      border: '1px solid #CBD5E1',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                      backgroundColor: !isPrivilegedAdmin ? '#F8FAFC' : '#FFFFFF',
+                      cursor: !isPrivilegedAdmin ? 'not-allowed' : 'pointer'
+                    }}
+                    onFocus={(e) => { if (isPrivilegedAdmin) e.target.style.borderColor = '#16A34A'; }}
+                    onBlur={(e) => { e.target.style.borderColor = '#CBD5E1'; }}
+                  >
+                    {ROLES.map((role) => (
+                      <option key={role.code} value={role.code}>
+                        {role.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              {/* Readonly Organization Details (Protected) */}
+              {/* Informational Guidance Notice */}
               <div style={{
-                background: '#F8FAFC',
-                border: '1px dashed #CBD5E1',
-                borderRadius: '10px',
-                padding: '14px 16px',
-                marginBottom: '10px'
+                background: isPrivilegedAdmin ? '#F0FDF4' : '#F8FAFC',
+                border: isPrivilegedAdmin ? '1px solid #BBF7D0' : '1px solid #E2E8F0',
+                borderRadius: '8px',
+                padding: '10px 14px',
+                fontSize: '0.78rem',
+                color: isPrivilegedAdmin ? '#15803D' : '#64748B',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
               }}>
-                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <i className="bi bi-lock-fill text-muted"></i>
-                  <span>Protected Organization Details (Managed by HR / IT Policy)</span>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px', fontSize: '0.82rem', color: '#475569' }}>
-                  <div>Email: <strong>{user.email || 'hradmin@urjafoods.net'}</strong></div>
-                  <div>Username: <strong>@{user.username || 'hradmin'}</strong></div>
-                  <div>Department: <strong>{user.department || user.dept || 'Human Resources'}</strong></div>
-                  <div>Role: <strong>{roleBadge.label}</strong></div>
-                </div>
+                <i className={isPrivilegedAdmin ? "bi bi-shield-check" : "bi bi-info-circle-fill"}></i>
+                <span>
+                  {isPrivilegedAdmin
+                    ? 'Administrator Access Active: You are authorized to modify all account fields including username, email, department, and role.'
+                    : 'Organization details (Email, Username, Department, Role) require administrator privileges to update. Full Name, Phone, and Photo are freely editable.'}
+                </span>
               </div>
             </form>
           )}
@@ -713,13 +1081,14 @@ export default function UserProfileModal({
                   cursor: isSaving ? 'not-allowed' : 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '6px'
+                  gap: '6px',
+                  boxShadow: '0 2px 6px rgba(21, 128, 61, 0.25)'
                 }}
               >
                 {isSaving ? (
                   <>
                     <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                    <span>Saving...</span>
+                    <span>Saving Changes...</span>
                   </>
                 ) : (
                   <>

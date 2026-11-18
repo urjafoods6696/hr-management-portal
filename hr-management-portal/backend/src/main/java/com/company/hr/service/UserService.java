@@ -584,6 +584,71 @@ public class UserService {
             user.setProfileImageUrl(request.getProfileImageUrl().trim().isEmpty() ? null : request.getProfileImageUrl().trim());
         }
 
+        boolean isPrivileged = currentUser.getAuthorities().stream().anyMatch(a -> 
+            "ROLE_IT_ADMIN".equals(a.getAuthority()) || "ROLE_HR_ADMIN".equals(a.getAuthority())
+        );
+
+        // Username
+        if (request.getUsername() != null && !request.getUsername().trim().isEmpty()) {
+            String newUsername = request.getUsername().trim().replaceAll("^@", "");
+            if (!newUsername.equalsIgnoreCase(user.getUsername())) {
+                if (!isPrivileged) {
+                    throw new org.springframework.security.access.AccessDeniedException("Only IT or HR Administrators are authorized to modify username.");
+                }
+                if (userRepository.existsByUsernameAndIdNot(newUsername, user.getId())) {
+                    throw new BadRequestException("Username '@" + newUsername + "' is already taken.");
+                }
+                user.setUsername(newUsername);
+            }
+        }
+
+        // Email
+        if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
+            String newEmail = request.getEmail().trim().toLowerCase();
+            if (!newEmail.equalsIgnoreCase(user.getEmail())) {
+                if (!isPrivileged) {
+                    throw new org.springframework.security.access.AccessDeniedException("Only IT or HR Administrators are authorized to modify email address.");
+                }
+                if (userRepository.existsByEmailAndIdNot(newEmail, user.getId())) {
+                    throw new BadRequestException("Email address '" + newEmail + "' is already registered to another user.");
+                }
+                user.setEmail(newEmail);
+            }
+        }
+
+        // Department
+        if (request.getDepartmentId() != null || (request.getDepartment() != null && !request.getDepartment().trim().isEmpty())) {
+            Long targetDeptId = request.getDepartmentId();
+            if (targetDeptId == null && request.getDepartment() != null && !request.getDepartment().trim().isEmpty()) {
+                Optional<Department> deptOpt = departmentRepository.findByDepartmentName(request.getDepartment().trim());
+                if (deptOpt.isPresent()) {
+                    targetDeptId = deptOpt.get().getId();
+                }
+            }
+            if (targetDeptId != null && !Objects.equals(targetDeptId, user.getDepartmentRestrictionId())) {
+                if (!isPrivileged) {
+                    throw new org.springframework.security.access.AccessDeniedException("Only IT or HR Administrators are authorized to modify department.");
+                }
+                user.setDepartmentRestrictionId(targetDeptId);
+            }
+        }
+
+        // Role
+        if (request.getRole() != null && !request.getRole().trim().isEmpty()) {
+            String reqRole = request.getRole().trim();
+            String fullRoleName = reqRole.startsWith("ROLE_") ? reqRole : "ROLE_" + reqRole;
+            boolean hasSameRole = user.getRoles().stream().anyMatch(r -> r.getRoleName().equalsIgnoreCase(fullRoleName));
+            if (!hasSameRole) {
+                if (!isPrivileged) {
+                    throw new org.springframework.security.access.AccessDeniedException("Only IT or HR Administrators are authorized to modify user roles.");
+                }
+                Role targetRole = roleRepository.findByRoleName(fullRoleName)
+                        .orElseThrow(() -> new BadRequestException("Role not found: " + fullRoleName));
+                user.getRoles().clear();
+                user.getRoles().add(targetRole);
+            }
+        }
+
         userRepository.save(user);
 
         // Record audit trail
@@ -594,7 +659,7 @@ public class UserService {
                     .action("USER_PROFILE_UPDATED")
                     .entityType("USER")
                     .entityId(String.valueOf(user.getId()))
-                    .newValue("{\"name\":\"" + user.getName() + "\",\"phone\":\"" + user.getPhoneNumber() + "\"}")
+                    .newValue("{\"name\":\"" + user.getName() + "\",\"phone\":\"" + user.getPhoneNumber() + "\",\"email\":\"" + user.getEmail() + "\"}")
                     .ipAddress("127.0.0.1")
                     .build());
         } catch (Exception e) {
@@ -602,5 +667,78 @@ public class UserService {
         }
 
         return getCurrentUserProfile(currentUser);
+    }
+
+    @Transactional
+    public UserResponseDto uploadUserProfileAvatar(UserPrincipal currentUser, org.springframework.web.multipart.MultipartFile file) throws java.io.IOException {
+        if (currentUser == null || currentUser.getId() == null) {
+            throw new BadRequestException("Unauthenticated user session.");
+        }
+        if (file == null || file.isEmpty()) {
+            throw new BadRequestException("No image file selected for upload.");
+        }
+
+        // 5 MB limit
+        if (file.getSize() > 5 * 1024 * 1024) {
+            throw new BadRequestException("File size exceeds 5MB limit. Please choose a smaller image.");
+        }
+
+        String contentType = file.getContentType();
+        String originalFilename = file.getOriginalFilename() != null ? file.getOriginalFilename().toLowerCase() : "";
+
+        boolean isAllowedMime = contentType != null && (
+                contentType.equalsIgnoreCase("image/jpeg") ||
+                contentType.equalsIgnoreCase("image/jpg") ||
+                contentType.equalsIgnoreCase("image/png") ||
+                contentType.equalsIgnoreCase("image/webp")
+        );
+
+        boolean isAllowedExt = originalFilename.endsWith(".jpg") ||
+                originalFilename.endsWith(".jpeg") ||
+                originalFilename.endsWith(".png") ||
+                originalFilename.endsWith(".webp");
+
+        if (!isAllowedMime && !isAllowedExt) {
+            throw new BadRequestException("Invalid file type. Only JPG, JPEG, PNG, and WEBP images are supported.");
+        }
+
+        String extension = ".png";
+        if (originalFilename.endsWith(".jpg") || originalFilename.endsWith(".jpeg")) extension = ".jpg";
+        else if (originalFilename.endsWith(".webp")) extension = ".webp";
+        else if (originalFilename.endsWith(".png")) extension = ".png";
+
+        String storageFileName = "user_" + currentUser.getId() + "_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 8) + extension;
+        java.nio.file.Path uploadDir = java.nio.file.Paths.get("uploads", "avatars").toAbsolutePath().normalize();
+        if (!java.nio.file.Files.exists(uploadDir)) {
+            java.nio.file.Files.createDirectories(uploadDir);
+        }
+
+        java.nio.file.Path targetLocation = uploadDir.resolve(storageFileName).normalize();
+        java.nio.file.Files.write(targetLocation, file.getBytes());
+
+        User user = userRepository.findById(currentUser.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + currentUser.getId()));
+
+        String avatarUrl = "/api/v1/users/avatar/" + storageFileName;
+        user.setProfileImageUrl(avatarUrl);
+        userRepository.save(user);
+
+        log.info("User {} uploaded new profile avatar: {}", user.getUsername(), avatarUrl);
+        return getCurrentUserProfile(currentUser);
+    }
+
+    public org.springframework.core.io.Resource getAvatarResource(String fileName) throws java.io.IOException {
+        if (fileName == null || fileName.isBlank() || fileName.contains("..") || fileName.contains("/") || fileName.contains("\\")) {
+            throw new BadRequestException("Invalid avatar filename.");
+        }
+
+        java.nio.file.Path uploadDir = java.nio.file.Paths.get("uploads", "avatars").toAbsolutePath().normalize();
+        java.nio.file.Path filePath = uploadDir.resolve(fileName).normalize();
+
+        if (!filePath.startsWith(uploadDir) || !java.nio.file.Files.exists(filePath) || !java.nio.file.Files.isReadable(filePath)) {
+            throw new ResourceNotFoundException("Avatar file not found: " + fileName);
+        }
+
+        return new org.springframework.core.io.UrlResource(filePath.toUri());
     }
 }

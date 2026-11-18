@@ -129,6 +129,29 @@ const normalizeRouteTab = (rawTab) => {
   return ROUTE_TAB_ALIASES[cleaned.toLowerCase()] || cleaned;
 };
 
+const resolveUserAvatarSrc = (url, role) => {
+  const base = (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL) || '/';
+  const cleanBase = base.endsWith('/') ? base : `${base}/`;
+  if (!url) {
+    return role === 'ROLE_DEPT_HEAD' 
+      ? `${cleanBase}assets/images/man.jpg` 
+      : `${cleanBase}assets/images/woman.jpg`;
+  }
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:') || url.startsWith('data:')) {
+    return url;
+  }
+  if (url.startsWith('/api/')) {
+    const apiBase = (typeof window !== 'undefined' && window.__API_BASE_URL__) ||
+      (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE_URL) ||
+      '';
+    return apiBase ? `${apiBase.replace(/\/$/, '')}${url}` : url;
+  }
+  if (url.startsWith('/assets/')) {
+    return `${cleanBase}${url.slice(1)}`;
+  }
+  return url;
+};
+
 // Parse current route from pathname and search query (supports nested paths like /candidates/123)
 const parseCurrentRoute = (pathnameInput = null, searchInput = null) => {
   if (typeof window === 'undefined' && pathnameInput === null) {
@@ -1515,7 +1538,7 @@ export default function App() {
                 title="Account Menu • Click to open profile"
               >
                 <img 
-                  src={currentUser?.profileImageUrl || currentUser?.avatar || (currentUser?.role === 'ROLE_DEPT_HEAD' ? `${import.meta.env.BASE_URL}assets/images/man.jpg` : `${import.meta.env.BASE_URL}assets/images/woman.jpg`)} 
+                  src={resolveUserAvatarSrc(currentUser?.profileImageUrl || currentUser?.avatar, currentUser?.role)} 
                   alt={currentUser?.name || 'User'} 
                   className="urja-header-avatar-v2"
                   onError={(e) => { 

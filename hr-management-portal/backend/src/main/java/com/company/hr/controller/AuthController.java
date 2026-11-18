@@ -96,6 +96,15 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.ok(profile, "Profile updated successfully."));
     }
 
+    @PostMapping(value = "/me/avatar", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Upload current authenticated user's profile avatar from device")
+    public ResponseEntity<ApiResponse<UserResponseDto>> uploadCurrentUserAvatar(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) throws java.io.IOException {
+        UserResponseDto profile = userService.uploadUserProfileAvatar(currentUser, file);
+        return ResponseEntity.ok(ApiResponse.ok(profile, "Profile avatar updated successfully."));
+    }
+
     @PostMapping("/logout")
     @Operation(summary = "Logout user and invalidate session")
     public ResponseEntity<ApiResponse<String>> logout() {

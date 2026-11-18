@@ -22,4 +22,14 @@ public class UserProfileUpdateRequest {
 
     @Size(max = 500, message = "Profile image URL cannot exceed 500 characters")
     private String profileImageUrl;
+
+    @Size(min = 3, max = 100, message = "Username must be between 3 and 100 characters")
+    private String username;
+
+    @Size(max = 150, message = "Email cannot exceed 150 characters")
+    private String email;
+
+    private String department;
+    private Long departmentId;
+    private String role;
 }

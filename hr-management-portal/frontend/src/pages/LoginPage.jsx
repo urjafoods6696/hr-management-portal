@@ -189,22 +189,22 @@ export default function LoginPage({ onLoginSuccess }) {
         <div className="urja-canvas-bg">
           {/* Top Grain Silos Facility */}
           <div className="canvas-photo-cell cell-silos">
-            <img src="/assets/images/silos.jpg" alt="Urja Agro Grain Silos Facility" />
+            <img src={`${import.meta.env.BASE_URL}assets/images/silos.jpg`} alt="Urja Agro Grain Silos Facility" />
           </div>
 
           {/* Center-Middle Baby Chick Diagonal Wedge with Glowing Lime Border */}
           <div className="canvas-photo-cell cell-chick">
-            <img src="/assets/images/chick.jpg" alt="Poultry Hatchery Chick & Soybeans" />
+            <img src={`${import.meta.env.BASE_URL}assets/images/chick.jpg`} alt="Poultry Hatchery Chick & Soybeans" />
           </div>
 
           {/* Bottom Woman HR Workspace */}
           <div className="canvas-photo-cell cell-woman">
-            <img src="/assets/images/woman.jpg" alt="Corporate HR Workspace" />
+            <img src={`${import.meta.env.BASE_URL}assets/images/woman.jpg`} alt="Corporate HR Workspace" />
           </div>
 
           {/* Right Foliage Header Area */}
           <div className="canvas-photo-cell cell-foliage">
-            <img src="/assets/images/leaves_bg.jpg" alt="Lush Soybean Foliage" />
+            <img src={`${import.meta.env.BASE_URL}assets/images/leaves_bg.jpg`} alt="Lush Soybean Foliage" />
           </div>
         </div>
 

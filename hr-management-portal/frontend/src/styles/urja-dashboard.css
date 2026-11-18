@@ -4698,3 +4698,111 @@
 
 
 
+
+
+/* ==============================================================================
+   CENTRALIZED USER PROFILE: SIDEBAR & DASHBOARD HEADER COMPONENTS
+   ============================================================================== */
+.urja-sidebar-user-section {
+  margin-top: auto;
+  margin-bottom: clamp(6px, 1.2vh, 12px);
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  z-index: 5;
+  padding: 0 8px;
+  box-sizing: border-box;
+}
+
+.urja-sidebar-user-pill {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  color: #FFFFFF;
+  text-decoration: none;
+  box-sizing: border-box;
+}
+
+.urja-sidebar-user-pill:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(132, 214, 35, 0.5);
+  transform: translateY(-1px);
+}
+
+.urja-sidebar-user-avatar {
+  width: clamp(36px, 4.5vh, 42px);
+  height: clamp(36px, 4.5vh, 42px);
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--urja-lime, #84d623);
+  background: #E2E8F0;
+  display: block;
+  flex-shrink: 0;
+}
+
+.urja-sidebar-user-meta {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+}
+
+.urja-sidebar-user-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #FFFFFF;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+.urja-sidebar-user-role {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--urja-lime, #84d623);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.urja-sidebar-v2.collapsed .urja-sidebar-user-meta {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .urja-sidebar-v2 .urja-sidebar-user-meta {
+    display: block !important;
+  }
+}
+
+/* Dashboard Greeting Header User Card */
+.urja-dashboard-header-user-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.urja-dashboard-header-user-card:hover {
+  border-color: #16A34A;
+  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.15);
+  transform: translateY(-1px);
+}

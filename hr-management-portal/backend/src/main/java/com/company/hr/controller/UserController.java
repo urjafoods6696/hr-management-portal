@@ -64,7 +64,7 @@ public class UserController {
 
         return ResponseEntity.ok()
                 .contentType(mediaType)
-                .header(org.springframework.http.HttpHeaders.CACHE_CONTROL, "public, max-age=604800")
+                .header(org.springframework.http.HttpHeaders.CACHE_CONTROL, "no-cache, must-revalidate")
                 .body(resource);
     }
 

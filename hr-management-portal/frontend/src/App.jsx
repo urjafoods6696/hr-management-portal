@@ -1,5 +1,6 @@
 import api, { authService, userService, getStoredToken, getStoredUser, setAuthSession, clearAuthSession, isJwtTokenValid, registerAuthFailureHandler, API_BASE_URL } from './services/api';
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useUserProfile, resolveUserAvatar, getRoleDisplayName, normalizeUserProfile } from './context/UserProfileContext';
 import './styles/portal.css';
 import './styles/urja-dashboard.css';
 import LoginPage from './pages/LoginPage';
@@ -129,27 +130,8 @@ const normalizeRouteTab = (rawTab) => {
   return ROUTE_TAB_ALIASES[cleaned.toLowerCase()] || cleaned;
 };
 
-const resolveUserAvatarSrc = (url, role) => {
-  const base = (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL) || '/';
-  const cleanBase = base.endsWith('/') ? base : `${base}/`;
-  if (!url) {
-    return role === 'ROLE_DEPT_HEAD' 
-      ? `${cleanBase}assets/images/man.jpg` 
-      : `${cleanBase}assets/images/woman.jpg`;
-  }
-  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:') || url.startsWith('data:')) {
-    return url;
-  }
-  if (url.startsWith('/api/')) {
-    const apiBase = (typeof window !== 'undefined' && window.__API_BASE_URL__) ||
-      (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE_URL) ||
-      '';
-    return apiBase ? `${apiBase.replace(/\/$/, '')}${url}` : url;
-  }
-  if (url.startsWith('/assets/')) {
-    return `${cleanBase}${url.slice(1)}`;
-  }
-  return url;
+const resolveUserAvatarSrc = (url, role, avatarVersion) => {
+  return resolveUserAvatar(url, role, avatarVersion);
 };
 
 // Parse current route from pathname and search query (supports nested paths like /candidates/123)
@@ -307,12 +289,18 @@ export default function App() {
 
   const [intendedRedirect, setIntendedRedirect] = useState(initialRoute.tab);
 
-  // Active Authenticated User & Role State
-  const [currentUser, setCurrentUser] = useState(() => getStoredUser() || null);
+  // Centralized Authenticated User & Role Profile Context
+  const { currentUser, setCurrentUser, refreshUserProfile } = useUserProfile();
   const [currentRoleId, setCurrentRoleId] = useState(() => {
     const u = getStoredUser();
     return u?.role || (u?.roles && u.roles[0]) || 'ROLE_HR_ADMIN';
   });
+
+  useEffect(() => {
+    if (currentUser?.role) {
+      setCurrentRoleId(currentUser.role);
+    }
+  }, [currentUser?.role]);
 
   // Navigation State
   const [activeTab, setActiveTab] = useState(initialRoute.tab);
@@ -448,28 +436,12 @@ export default function App() {
         const designation = verifiedUser.designation || verifiedUser.title || userObj.designation || userObj.title || 'HR Administrator';
         const avatar = verifiedUser.profileImageUrl || verifiedUser.avatar || userObj.avatar || (primaryRole === 'ROLE_DEPT_HEAD' ? '/assets/images/man.jpg' : '/assets/images/woman.jpg');
 
-        const fullUser = {
-          ...userObj,
-          id: verifiedUser.id || userObj.id,
-          name: verifiedUser.name || userObj.name,
-          email: verifiedUser.email || userObj.email,
-          username: verifiedUser.username || userObj.username,
-          roles: verifiedUser.roles || (userObj.roles || [primaryRole]),
-          role: primaryRole,
-          token: storedToken,
-          avatar: avatar,
-          profileImageUrl: avatar,
-          title: designation,
-          designation: designation,
-          dept: dept,
-          department: dept,
-          status: verifiedUser.status || 'ACTIVE'
-        };
+        const normalized = normalizeUserProfile({ ...userObj, ...verifiedUser }, storedToken);
 
         if (!isCancelled) {
-          setCurrentUser(fullUser);
-          setCurrentRoleId(primaryRole);
-          setAuthSession(storedToken, fullUser);
+          setCurrentUser(normalized);
+          setCurrentRoleId(normalized.role);
+          setAuthSession(storedToken, normalized);
           setIsAuthenticated(true);
                 try {
             localStorage.setItem(LAST_ACTIVITY_KEY, Date.now().toString());
@@ -1102,53 +1074,23 @@ export default function App() {
     const primaryRole = (authData.roles && authData.roles[0]) || authData.role || 'ROLE_HR_ADMIN';
     const token = authData.token || authData.accessToken;
 
-    let fullUser = {
-      id: authData.id,
-      name: authData.name || 'User',
-      username: authData.username || '',
-      email: authData.email || '',
-      role: primaryRole,
-      roles: authData.roles || [primaryRole],
-      avatar: authData.profileImageUrl || (primaryRole === 'ROLE_DEPT_HEAD' ? '/assets/images/man.jpg' : '/assets/images/woman.jpg'),
-      profileImageUrl: authData.profileImageUrl || (primaryRole === 'ROLE_DEPT_HEAD' ? '/assets/images/man.jpg' : '/assets/images/woman.jpg'),
-      title: authData.title || 'Staff',
-      designation: authData.title || 'Staff',
-      dept: 'Human Resources',
-      department: 'Human Resources',
-      token: token,
-      status: 'ACTIVE'
-    };
-
+    let userDetails = { ...authData };
     try {
       const meRes = await api.get('/api/users/me', {
         headers: { Authorization: `Bearer ${token}` }
       });
       const meData = meRes.data?.data || meRes.data;
       if (meData) {
-        fullUser = {
-          ...fullUser,
-          id: meData.id || fullUser.id,
-          name: meData.name || fullUser.name,
-          username: meData.username || fullUser.username,
-          email: meData.email || fullUser.email,
-          role: (meData.roles && meData.roles[0]) || fullUser.role,
-          roles: meData.roles || fullUser.roles,
-          dept: meData.department || meData.departmentName || fullUser.dept,
-          department: meData.department || meData.departmentName || fullUser.department,
-          title: meData.designation || meData.title || fullUser.title,
-          designation: meData.designation || meData.title || fullUser.designation,
-          avatar: meData.profileImageUrl || meData.avatar || fullUser.avatar,
-          profileImageUrl: meData.profileImageUrl || meData.avatar || fullUser.profileImageUrl,
-          status: meData.status || fullUser.status
-        };
+        userDetails = { ...userDetails, ...meData };
       }
     } catch (e) {
       console.warn('Profile fetch after login encountered error:', e);
     }
 
-    setCurrentUser(fullUser);
-    setCurrentRoleId(fullUser.role);
-    setAuthSession(token, fullUser);
+    const normalized = normalizeUserProfile(userDetails, token);
+    setCurrentUser(normalized);
+    setCurrentRoleId(normalized.role);
+    setAuthSession(token, normalized);
 
     // Same page persistence: target route from current URL, intended redirect, or role default
     const route = parseCurrentRoute();
@@ -1455,6 +1397,50 @@ export default function App() {
           })}
         </ul>
 
+        {/* Sidebar Logged-in User Profile Section (Requirement 2) */}
+        <div className="urja-sidebar-user-section">
+          <div 
+            className="urja-sidebar-user-pill"
+            id="sidebarUserProfileCard"
+            onClick={() => setShowUserProfileModal(true)}
+            title={`Logged in as ${currentUser?.name || 'User'} (${getRoleDisplayName(currentUser?.role)}) • Click to view or edit profile`}
+          >
+            <div style={{ position: 'relative', flexShrink: 0 }}>
+              <img 
+                src={resolveUserAvatar(currentUser?.profileImageUrl || currentUser?.avatar, currentUser?.role, currentUser?.avatarVersion)}
+                alt={currentUser?.name || 'User'}
+                className="urja-sidebar-user-avatar"
+                id="sidebarUserAvatar"
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = currentUser?.role === 'ROLE_DEPT_HEAD' 
+                    ? `${import.meta.env.BASE_URL}assets/images/man.jpg` 
+                    : `${import.meta.env.BASE_URL}assets/images/woman.jpg`;
+                }}
+              />
+              <span style={{
+                position: 'absolute',
+                bottom: 0,
+                right: 0,
+                width: '10px',
+                height: '10px',
+                backgroundColor: '#22c55e',
+                border: '2px solid #062B1B',
+                borderRadius: '50%'
+              }}></span>
+            </div>
+            
+            <div className="urja-sidebar-user-meta">
+              <div className="urja-sidebar-user-name" id="sidebarUserName">
+                {currentUser?.name || 'HR Administrator'}
+              </div>
+              <div className="urja-sidebar-user-role" id="sidebarUserRole">
+                {currentUser?.designation || currentUser?.title || getRoleDisplayName(currentUser?.role)}
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Decorative Leaf SVG in Bottom Left */}
         <div className="urja-sidebar-footer-leaf">
           <svg viewBox="0 0 200 160" fill="none" style={{ width: '100%', height: '100%' }}>
@@ -1538,17 +1524,18 @@ export default function App() {
                 title="Account Menu • Click to open profile"
               >
                 <img 
-                  src={resolveUserAvatarSrc(currentUser?.profileImageUrl || currentUser?.avatar, currentUser?.role)} 
+                  src={resolveUserAvatar(currentUser?.profileImageUrl || currentUser?.avatar, currentUser?.role, currentUser?.avatarVersion)} 
                   alt={currentUser?.name || 'User'} 
                   className="urja-header-avatar-v2"
+                  id="topNavUserAvatar"
                   onError={(e) => { 
                     e.target.onerror = null;
                     e.target.src = currentUser?.role === 'ROLE_DEPT_HEAD' ? `${import.meta.env.BASE_URL}assets/images/man.jpg` : `${import.meta.env.BASE_URL}assets/images/woman.jpg`; 
                   }}
                 />
                 <div className="urja-header-user-info-v2">
-                  <span className="urja-header-user-name-v2">{currentUser?.name || 'Urja User'}</span>
-                  <span className="urja-header-user-title-v2">{currentUser?.title || (currentUser?.role === 'ROLE_DEPT_HEAD' ? 'Department Head' : 'HR Executive')}</span>
+                  <span className="urja-header-user-name-v2" id="topNavUserName">{currentUser?.name || 'Urja User'}</span>
+                  <span className="urja-header-user-title-v2" id="topNavUserTitle">{currentUser?.designation || currentUser?.title || getRoleDisplayName(currentUser?.role)}</span>
                 </div>
                 <i className="bi bi-chevron-down urja-header-chevron-v2"></i>
               </div>
@@ -1565,10 +1552,10 @@ export default function App() {
                       setShowUserProfileModal(true);
                     }}
                   >
-                    <div className="urja-dropdown-header-name">{currentUser?.name || 'Urja User'}</div>
-                    <div className="urja-dropdown-header-email">{currentUser?.email || ''}</div>
-                    <div className="urja-dropdown-header-dept">
-                      {(currentUser?.department || currentUser?.dept || 'Human Resources')} • {(currentUser?.designation || currentUser?.title || 'Team Member')}
+                    <div className="urja-dropdown-header-name" id="dropdownUserName">{currentUser?.name || 'Urja User'}</div>
+                    <div className="urja-dropdown-header-email" id="dropdownUserEmail">{currentUser?.email || ''}</div>
+                    <div className="urja-dropdown-header-dept" id="dropdownUserDept">
+                      {(currentUser?.department || currentUser?.dept || 'Human Resources')} • {(currentUser?.designation || currentUser?.title || getRoleDisplayName(currentUser?.role))}
                     </div>
                   </div>
 
@@ -1678,24 +1665,85 @@ export default function App() {
               ============================================================================ */}
           {activeTab === 'dashboard' && (
             <div className="urja-dashboard-body-v2">
-              {/* 1. DYNAMIC GREETING WITH LEAF ICON (Requirement 1) */}
-              <div className="urja-greeting-banner-v2">
-                <div className="urja-greeting-leaf-wrap-v2">
-                  <svg viewBox="0 0 24 24" fill="#22C55E" width="40" height="40">
-                    <path d="M17 8C8 10 5.9 16.17 3.82 21.34l1.89.66.95-2.3c.48.17.98.3 1.34.3C19 20 22 3 22 3c-1 2-8 2.25-13 3.25S2 11.5 2 13.5s1.75 3.75 1.75 3.75C7 8 17 8 17 8z"/>
-                  </svg>
+              {/* 1. DYNAMIC GREETING WITH LEAF ICON & CENTRALIZED USER PROFILE (Requirement 1 & 3) */}
+              <div className="urja-greeting-banner-v2" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  <div className="urja-greeting-leaf-wrap-v2">
+                    <svg viewBox="0 0 24 24" fill="#22C55E" width="40" height="40">
+                      <path d="M17 8C8 10 5.9 16.17 3.82 21.34l1.89.66.95-2.3c.48.17.98.3 1.34.3C19 20 22 3 22 3c-1 2-8 2.25-13 3.25S2 11.5 2 13.5s1.75 3.75 1.75 3.75C7 8 17 8 17 8z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <h1 className="urja-greeting-title-v2">
+                      {userFirstName ? (
+                        <>
+                          {dynamicGreeting}, <span className="urja-name-highlight-v2">{userFirstName}!</span>
+                        </>
+                      ) : (
+                        'Welcome!'
+                      )}
+                    </h1>
+                    <p className="urja-greeting-sub-v2">Here's an overview of your activities today.</p>
+                  </div>
                 </div>
-                <div>
-                  <h1 className="urja-greeting-title-v2">
-                    {userFirstName ? (
-                      <>
-                        {dynamicGreeting}, <span className="urja-name-highlight-v2">{userFirstName}!</span>
-                      </>
-                    ) : (
-                      'Welcome!'
-                    )}
-                  </h1>
-                  <p className="urja-greeting-sub-v2">Here's an overview of your activities today.</p>
+
+                {/* Dashboard Header User Identity Card (Requirement 3) */}
+                <div 
+                  className="urja-dashboard-header-user-card"
+                  id="dashboardHeaderUserCard"
+                  onClick={() => setShowUserProfileModal(true)}
+                  title="Click to view or edit your profile"
+                >
+                  <div style={{ position: 'relative' }}>
+                    <img 
+                      src={resolveUserAvatar(currentUser?.profileImageUrl || currentUser?.avatar, currentUser?.role, currentUser?.avatarVersion)}
+                      alt={currentUser?.name || 'User'}
+                      id="dashboardHeaderUserAvatar"
+                      style={{
+                        width: '42px',
+                        height: '42px',
+                        borderRadius: '50%',
+                        objectFit: 'cover',
+                        border: '2px solid #16A34A',
+                        display: 'block'
+                      }}
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = currentUser?.role === 'ROLE_DEPT_HEAD' 
+                          ? `${import.meta.env.BASE_URL}assets/images/man.jpg` 
+                          : `${import.meta.env.BASE_URL}assets/images/woman.jpg`;
+                      }}
+                    />
+                    <span style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      right: 0,
+                      width: '10px',
+                      height: '10px',
+                      backgroundColor: '#22c55e',
+                      border: '2px solid #FFFFFF',
+                      borderRadius: '50%'
+                    }}></span>
+                  </div>
+
+                  <div>
+                    <div className="urja-dashboard-header-user-name" id="dashboardHeaderUserName" style={{ fontSize: '0.88rem', fontWeight: 700, color: '#0F172A', lineHeight: 1.2 }}>
+                      {currentUser?.name || 'HR Administrator'}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                      <span className="urja-dashboard-header-user-role" id="dashboardHeaderUserRole" style={{
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        color: '#15803D',
+                        background: '#DCFCE7',
+                        padding: '1px 8px',
+                        borderRadius: '999px',
+                        display: 'inline-block'
+                      }}>
+                        {getRoleDisplayName(currentUser?.role)}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -2324,7 +2372,7 @@ export default function App() {
         onClose={() => setShowUserProfileModal(false)}
         currentUser={currentUser}
         onProfileUpdated={(updated) => {
-          setCurrentUser(prev => ({ ...prev, ...updated }));
+          setCurrentUser(updated);
           showToast('Profile updated successfully.');
         }}
         onChangePasswordClick={() => setShowAdminPasswordModal(true)}

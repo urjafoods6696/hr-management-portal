@@ -1,8 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { authService, API_BASE_URL } from '../services/api';
-
-const BASE = (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL) || '/';
-const cleanBase = BASE.endsWith('/') ? BASE : `${BASE}/`;
+import { useUserProfile, resolveUserAvatar, getRoleDisplayName } from '../context/UserProfileContext';
 
 // Recognized organizational departments in ATS Urja
 const DEPARTMENTS = [
@@ -26,41 +23,18 @@ const ROLES = [
   { code: 'ROLE_EMPLOYEE', label: 'Standard Employee' }
 ];
 
-/**
- * Safely resolves avatar URLs:
- * - blob: and data: URLs (local client previews)
- * - absolute http/https URLs
- * - backend relative URLs (/api/v1/users/avatar/...)
- * - fallback static assets
- */
-function resolveAvatarUrl(url, fallbackRole) {
-  if (!url) {
-    return fallbackRole === 'ROLE_DEPT_HEAD'
-      ? `${cleanBase}assets/images/man.jpg`
-      : `${cleanBase}assets/images/woman.jpg`;
-  }
-  if (url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('http://') || url.startsWith('https://')) {
-    return url;
-  }
-  if (url.startsWith('/api/')) {
-    const base = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
-    return `${base}${url}`;
-  }
-  if (url.startsWith('/assets/')) {
-    return `${cleanBase}${url.slice(1)}`;
-  }
-  return url;
-}
-
 export default function UserProfileModal({
   isOpen,
   onClose,
-  currentUser,
+  currentUser: propUser,
   onProfileUpdated = () => {},
   onChangePasswordClick,
   onSignOut
 }) {
-  const [profileData, setProfileData] = useState(currentUser);
+  const { currentUser: contextUser, updateUserProfile, refreshUserProfile } = useUserProfile();
+  const effectiveUser = contextUser || propUser || {};
+
+  const [profileData, setProfileData] = useState(effectiveUser);
   const [isLoading, setIsLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -81,35 +55,41 @@ export default function UserProfileModal({
   const [editDepartment, setEditDepartment] = useState('Human Resources & Talent Acquisition');
   const [editRole, setEditRole] = useState('ROLE_HR_ADMIN');
 
-  const user = profileData || currentUser || {};
+  const user = profileData || effectiveUser || {};
   const isPrivilegedAdmin = user.role === 'ROLE_IT_ADMIN' || user.role === 'ROLE_HR_ADMIN' ||
     (Array.isArray(user.roles) && (user.roles.includes('ROLE_IT_ADMIN') || user.roles.includes('ROLE_HR_ADMIN')));
 
-  // Populate state whenever modal opens or user data changes
+  // Populate state whenever modal opens
   useEffect(() => {
     if (isOpen) {
-      setProfileData(currentUser);
+      setProfileData(effectiveUser);
       setIsEditing(false);
       setErrorMessage('');
       setSuccessMessage('');
       setSelectedFile(null);
       setPreviewUrl(null);
 
-      syncFormFields(currentUser);
+      syncFormFields(effectiveUser);
 
-      // Fetch freshest profile from backend
+      // Fetch freshest profile from backend once on modal open
       setIsLoading(true);
-      authService.getCurrentUser()
+      refreshUserProfile()
         .then((res) => {
           if (res) {
             setProfileData(res);
-            syncFormFields(res);
+            setIsEditing((currentEditing) => {
+              if (!currentEditing) {
+                syncFormFields(res);
+              }
+              return currentEditing;
+            });
           }
         })
         .catch(() => {})
         .finally(() => setIsLoading(false));
     }
-  }, [isOpen, currentUser]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   // Clean up object URL when unmounting or changing preview
   useEffect(() => {
@@ -122,8 +102,8 @@ export default function UserProfileModal({
 
   const syncFormFields = (data) => {
     if (!data) return;
-    setEditName(data.name || '');
-    setEditPhone(data.phoneNumber || '');
+    setEditName(data.name || data.fullName || '');
+    setEditPhone(data.phone || data.phoneNumber || '');
     setEditEmail(data.email || '');
     setEditUsername(data.username || '');
 
@@ -140,28 +120,7 @@ export default function UserProfileModal({
 
   if (!isOpen) return null;
 
-  const getRoleBadge = (roleName) => {
-    switch (roleName) {
-      case 'ROLE_IT_ADMIN':
-        return { label: 'IT Administrator', bg: '#EFF6FF', color: '#1D4ED8', border: '#BFDBFE' };
-      case 'ROLE_HR_ADMIN':
-        return { label: 'HR Administrator', bg: '#F0FDF4', color: '#15803D', border: '#BBF7D0' };
-      case 'ROLE_HR_RECRUITER':
-        return { label: 'Senior Technical Recruiter', bg: '#FDF4FF', color: '#86198F', border: '#F5D0FE' };
-      case 'ROLE_DEPT_HEAD':
-        return { label: 'Department Head', bg: '#FFFBEB', color: '#B45309', border: '#FDE68A' };
-      case 'ROLE_APPROVING_MANAGER':
-        return { label: 'Approving Manager', bg: '#F8FAFC', color: '#334155', border: '#CBD5E1' };
-      case 'ROLE_SENIOR_MGMT':
-        return { label: 'Senior Leadership / VP', bg: '#FDF2F8', color: '#9D174D', border: '#FBCFE8' };
-      case 'ROLE_INTERVIEWER':
-        return { label: 'Technical Lead / Interviewer', bg: '#F0FDF4', color: '#166534', border: '#BBF7D0' };
-      default:
-        return { label: user.title || 'Standard Employee', bg: '#F0FDF4', color: '#16A34A', border: '#BBF7D0' };
-    }
-  };
-
-  const roleBadge = getRoleBadge(user.role || (Array.isArray(user.roles) ? user.roles[0] : ''));
+  const roleLabel = getRoleDisplayName(user.role || (Array.isArray(user.roles) ? user.roles[0] : ''));
 
   const handleStartEdit = () => {
     syncFormFields(user);
@@ -222,7 +181,7 @@ export default function UserProfileModal({
     const objectUrl = URL.createObjectURL(file);
     setSelectedFile(file);
     setPreviewUrl(objectUrl);
-    setIsEditing(true); // Automatically ensure editing mode is active
+    setIsEditing(true);
   };
 
   const handleSaveProfile = async (e) => {
@@ -252,26 +211,11 @@ export default function UserProfileModal({
     setIsSaving(true);
 
     try {
-      let finalAvatarUrl = user.profileImageUrl || user.avatar;
-
-      // 1. Upload device image if a new one was selected
-      if (selectedFile) {
-        const uploadRes = await authService.uploadAvatar(selectedFile);
-        if (uploadRes && uploadRes.profileImageUrl) {
-          finalAvatarUrl = uploadRes.profileImageUrl;
-        }
-        if (previewUrl && previewUrl.startsWith('blob:')) {
-          URL.revokeObjectURL(previewUrl);
-        }
-        setSelectedFile(null);
-        setPreviewUrl(null);
-      }
-
-      // 2. Update user profile fields
       const payload = {
         name: editName.trim(),
+        fullName: editName.trim(),
         phoneNumber: editPhone ? editPhone.trim() : '',
-        profileImageUrl: finalAvatarUrl
+        phone: editPhone ? editPhone.trim() : ''
       };
 
       if (isPrivilegedAdmin) {
@@ -282,7 +226,14 @@ export default function UserProfileModal({
         payload.role = editRole;
       }
 
-      const updated = await authService.updateCurrentUserProfile(payload);
+      // 1. Submit through Centralized Profile Manager (uploads image & syncs backend)
+      const updated = await updateUserProfile(payload, selectedFile);
+
+      if (previewUrl && previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(previewUrl);
+      }
+      setSelectedFile(null);
+      setPreviewUrl(null);
       setIsSaving(false);
       setProfileData(updated);
       setSuccessMessage('Profile and account details updated successfully!');
@@ -291,6 +242,11 @@ export default function UserProfileModal({
       if (onProfileUpdated) {
         onProfileUpdated(updated);
       }
+
+      // Requirement 4, item 6: Close modal after successful saving
+      setTimeout(() => {
+        onClose();
+      }, 500);
     } catch (err) {
       setIsSaving(false);
       const msg = err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to update user profile.';
@@ -299,7 +255,7 @@ export default function UserProfileModal({
   };
 
   // Currently displayed image
-  const displayImageSrc = previewUrl || resolveAvatarUrl(user.profileImageUrl || user.avatar, user.role);
+  const displayImageSrc = previewUrl || resolveUserAvatar(user.profileImageUrl || user.avatar, user.role, user.avatarVersion);
 
   return (
     <div className="urja-modal-backdrop" onClick={onClose} style={{ zIndex: 1050 }}>
@@ -360,8 +316,8 @@ export default function UserProfileModal({
                 onError={(e) => {
                   e.target.onerror = null;
                   e.target.src = user.role === 'ROLE_DEPT_HEAD'
-                    ? `${cleanBase}assets/images/man.jpg`
-                    : `${cleanBase}assets/images/woman.jpg`;
+                    ? `${(typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL) || '/'}assets/images/man.jpg`
+                    : `${(typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL) || '/'}assets/images/woman.jpg`;
                 }}
               />
 
@@ -448,7 +404,7 @@ export default function UserProfileModal({
                   fontSize: '0.75rem',
                   fontWeight: 600
                 }}>
-                  {roleBadge.label}
+                  {roleLabel}
                 </span>
 
                 <span style={{
@@ -583,7 +539,7 @@ export default function UserProfileModal({
                     Full Name
                   </div>
                   <div style={{ fontSize: '0.92rem', fontWeight: 600, color: '#0F172A', marginTop: '2px' }}>
-                    {user.name || 'HR Administrator'}
+                    {user.name || user.fullName || 'HR Administrator'}
                   </div>
                 </div>
 
@@ -610,7 +566,7 @@ export default function UserProfileModal({
                     Contact Phone Number
                   </div>
                   <div style={{ fontSize: '0.92rem', fontWeight: 600, color: '#0F172A', marginTop: '2px' }}>
-                    {user.phoneNumber || '+91 98200 99999'}
+                    {user.phone || user.phoneNumber || '+91 98200 99999'}
                   </div>
                 </div>
 
@@ -628,7 +584,7 @@ export default function UserProfileModal({
                     Role & Authority Level
                   </div>
                   <div style={{ fontSize: '0.92rem', fontWeight: 600, color: '#0F172A', marginTop: '2px' }}>
-                    {roleBadge.label}
+                    {roleLabel}
                   </div>
                 </div>
               </div>

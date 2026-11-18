@@ -7,9 +7,9 @@ export const LAST_ACTIVITY_KEY = 'ats_urja_last_activity';
 export const SESSION_EXPIRED_KEY = 'ats_session_expired_msg';
 
 // Base URL configuration
-export const API_BASE_URL = 
-  (typeof window !== 'undefined' && window.__API_BASE_URL__) || 
-  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE_URL) || 
+export const API_BASE_URL =
+  (typeof window !== 'undefined' && window.__API_BASE_URL__) ||
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE_URL) ||
   'http://localhost:8080';
 
 /**
@@ -93,7 +93,7 @@ export function getStoredUser() {
     if (sessionUser) return JSON.parse(sessionUser);
     const localUser = localStorage.getItem(USER_STORAGE_KEY);
     if (localUser) return JSON.parse(localUser);
-  } catch (e) {}
+  } catch (e) { }
   return null;
 }
 
@@ -132,7 +132,7 @@ export function clearAuthSession() {
     sessionStorage.removeItem(USER_STORAGE_KEY);
     localStorage.removeItem(TOKEN_STORAGE_KEY);
     localStorage.removeItem(USER_STORAGE_KEY);
-  } catch (e) {}
+  } catch (e) { }
 }
 
 // Mutex flag & handler registration to prevent multiple simultaneous logout/redirect storms
@@ -150,7 +150,7 @@ export function triggerAuthFailure(reason) {
   clearAuthSession();
   try {
     sessionStorage.removeItem(SESSION_EXPIRED_KEY);
-  } catch (e) {}
+  } catch (e) { }
 
   if (typeof authFailureHandler === 'function') {
     authFailureHandler();
@@ -295,7 +295,7 @@ export const userService = {
       const merged = { ...currentStored, ...updated };
       sessionStorage.setItem(USER_STORAGE_KEY, JSON.stringify(merged));
       localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(merged));
-    } catch (e) {}
+    } catch (e) { }
     return updated;
   }
 };
@@ -331,7 +331,7 @@ export const authService = {
       const merged = { ...currentStored, ...updated };
       sessionStorage.setItem(USER_STORAGE_KEY, JSON.stringify(merged));
       localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(merged));
-    } catch (e) {}
+    } catch (e) { }
     return updated;
   },
 

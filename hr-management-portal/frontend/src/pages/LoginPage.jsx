@@ -234,7 +234,7 @@ export default function LoginPage({ onLoginSuccess }) {
             </div>
             
             <div className="urja-company-name">Urja Foods & Agro Pvt. Ltd.</div>
-            <div className="urja-company-devanagari">ऊर्जा फूड्स अँड अ‍ॅग्रो</div>
+            <div className="urja-company-devanagari">ऊर्जा फूड्स अँड अॅग्रो</div>
 
             {/* Accent Lime Bar */}
             <div className="urja-lime-accent-bar"></div>
@@ -360,7 +360,7 @@ export default function LoginPage({ onLoginSuccess }) {
               </p>
             </div>
 
-{errorMessage && (
+            {errorMessage && (
               <div className="urja-card-error">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="12" cy="12" r="10"></circle>

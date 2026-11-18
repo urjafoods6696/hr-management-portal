@@ -118,7 +118,8 @@ const ROUTE_TAB_ALIASES = {
   calendar: 'calendar',
   'my-calendar': 'calendar',
   talentpool: 'talentPool',
-  'talent-pool': 'talentPool'
+  'talent-pool': 'talentPool',
+  'hr-management-portal': 'dashboard'
 };
 
 const normalizeRouteTab = (rawTab) => {
@@ -134,9 +135,18 @@ const parseCurrentRoute = (pathnameInput = null, searchInput = null) => {
     return { tab: 'dashboard', pathname: '/', search: '', urlParams: new URLSearchParams(), segments: [], nestedSegments: [] };
   }
 
-  const pathname = pathnameInput !== null ? pathnameInput : window.location.pathname; // e.g. "/candidates/123" or "/dashboard/reports"
+  let pathname = pathnameInput !== null ? pathnameInput : window.location.pathname; // e.g. "/candidates/123" or "/dashboard/reports"
   const search = searchInput !== null ? searchInput : window.location.search;       // e.g. "?tab=reports"
   const urlParams = new URLSearchParams(search || '');
+
+  // Strip Vite base URL (e.g. /hr-management-portal/) if present
+  const base = (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL) || '/';
+  if (base && base !== '/') {
+    const normalizedBase = base.endsWith('/') ? base.slice(0, -1) : base;
+    if (pathname.startsWith(normalizedBase)) {
+      pathname = pathname.slice(normalizedBase.length) || '/';
+    }
+  }
 
   const tabFromQuery = urlParams.get('tab');
   let tabFromPath = null;
@@ -174,10 +184,20 @@ const syncUrlWithRoute = (tab, extraParams = null) => {
   if (typeof window === 'undefined') return;
 
   const canonicalTab = normalizeRouteTab(tab);
-  const pathname = window.location.pathname;
+  const base = (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL) || '/';
+  const cleanBase = base.endsWith('/') ? base : `${base}/`;
+
+  let pathname = window.location.pathname;
+  if (base && base !== '/') {
+    const normalizedBase = base.endsWith('/') ? base.slice(0, -1) : base;
+    if (pathname.startsWith(normalizedBase)) {
+      pathname = pathname.slice(normalizedBase.length) || '/';
+    }
+  }
+
   let newUrl;
   if (pathname.startsWith('/dashboard')) {
-    newUrl = `/dashboard/${canonicalTab}`;
+    newUrl = `${cleanBase}dashboard/${canonicalTab}`;
   } else {
     const params = new URLSearchParams(window.location.search);
     params.set('tab', canonicalTab);
@@ -187,7 +207,7 @@ const syncUrlWithRoute = (tab, extraParams = null) => {
         else params.set(k, v);
       });
     }
-    newUrl = `/?${params.toString()}`;
+    newUrl = `${cleanBase}?${params.toString()}`;
   }
 
   const currentFull = window.location.pathname + window.location.search;
@@ -1495,11 +1515,12 @@ export default function App() {
                 title="Account Menu • Click to open profile"
               >
                 <img 
-                  src={currentUser?.profileImageUrl || currentUser?.avatar || (currentUser?.role === 'ROLE_DEPT_HEAD' ? '/assets/images/man.jpg' : '/assets/images/woman.jpg')} 
+                  src={currentUser?.profileImageUrl || currentUser?.avatar || (currentUser?.role === 'ROLE_DEPT_HEAD' ? `${import.meta.env.BASE_URL}assets/images/man.jpg` : `${import.meta.env.BASE_URL}assets/images/woman.jpg`)} 
                   alt={currentUser?.name || 'User'} 
                   className="urja-header-avatar-v2"
                   onError={(e) => { 
-                    e.target.src = currentUser?.role === 'ROLE_DEPT_HEAD' ? '/assets/images/man.jpg' : '/assets/images/woman.jpg'; 
+                    e.target.onerror = null;
+                    e.target.src = currentUser?.role === 'ROLE_DEPT_HEAD' ? `${import.meta.env.BASE_URL}assets/images/man.jpg` : `${import.meta.env.BASE_URL}assets/images/woman.jpg`; 
                   }}
                 />
                 <div className="urja-header-user-info-v2">
@@ -1989,10 +2010,13 @@ export default function App() {
                   <div key={c.id} className="urja-talent-card">
                     {c.avatar && c.avatar.startsWith('/') ? (
                       <img 
-                        src={c.avatar} 
+                        src={c.avatar.startsWith('/') ? `${import.meta.env.BASE_URL}${c.avatar.slice(1)}` : c.avatar} 
                         alt={c.name} 
                         className="urja-talent-avatar" 
-                        onError={(e) => { e.target.src = '/assets/images/man.jpg'; }}
+                        onError={(e) => { 
+                          e.target.onerror = null;
+                          e.target.src = `${import.meta.env.BASE_URL}assets/images/man.jpg`; 
+                        }}
                       />
                     ) : (
                       <div className="urja-talent-avatar">

@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { authService } from '../services/api';
 
+const BASE = (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL) || '/';
+const cleanBase = BASE.endsWith('/') ? BASE : `${BASE}/`;
+
 const PRESET_AVATARS = [
-  { id: 'woman', label: 'Corporate Lead (F)', url: '/assets/images/woman.jpg' },
-  { id: 'man', label: 'Corporate Lead (M)', url: '/assets/images/man.jpg' },
-  { id: 'neha', label: 'Professional Neha', url: '/assets/images/cand_neha.jpg' },
-  { id: 'amit', label: 'Executive Amit', url: '/assets/images/cand_amit.jpg' },
-  { id: 'sneha', label: 'Specialist Sneha', url: '/assets/images/cand_sneha.jpg' },
-  { id: 'vikram', label: 'Manager Vikram', url: '/assets/images/cand_vikram.jpg' }
+  { id: 'woman', label: 'Corporate Lead (F)', url: `${cleanBase}assets/images/woman.jpg` },
+  { id: 'man', label: 'Corporate Lead (M)', url: `${cleanBase}assets/images/man.jpg` },
+  { id: 'neha', label: 'Professional Neha', url: `${cleanBase}assets/images/cand_neha.jpg` },
+  { id: 'amit', label: 'Executive Amit', url: `${cleanBase}assets/images/cand_amit.jpg` },
+  { id: 'sneha', label: 'Specialist Sneha', url: `${cleanBase}assets/images/cand_sneha.jpg` },
+  { id: 'vikram', label: 'Manager Vikram', url: `${cleanBase}assets/images/cand_vikram.jpg` }
 ];
 
 export default function UserProfileModal({
@@ -183,7 +186,7 @@ export default function UserProfileModal({
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <div style={{ position: 'relative' }}>
               <img 
-                src={(isEditing ? (customAvatarUrl || editAvatar) : (user.profileImageUrl || user.avatar)) || (user.role === 'ROLE_DEPT_HEAD' ? '/assets/images/man.jpg' : '/assets/images/woman.jpg')}
+                src={(isEditing ? (customAvatarUrl || editAvatar) : (user.profileImageUrl || user.avatar)) || (user.role === 'ROLE_DEPT_HEAD' ? `${cleanBase}assets/images/man.jpg` : `${cleanBase}assets/images/woman.jpg`)}
                 alt={user.name || 'User'}
                 style={{
                   width: '68px',
@@ -194,7 +197,8 @@ export default function UserProfileModal({
                   boxShadow: '0 4px 10px rgba(0,0,0,0.15)'
                 }}
                 onError={(e) => { 
-                  e.target.src = user.role === 'ROLE_DEPT_HEAD' ? '/assets/images/man.jpg' : '/assets/images/woman.jpg'; 
+                  e.target.onerror = null;
+                  e.target.src = user.role === 'ROLE_DEPT_HEAD' ? `${cleanBase}assets/images/man.jpg` : `${cleanBase}assets/images/woman.jpg`; 
                 }}
               />
               <span style={{

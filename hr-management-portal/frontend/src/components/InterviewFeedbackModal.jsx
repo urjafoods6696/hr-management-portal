@@ -76,10 +76,13 @@ export default function InterviewFeedbackModal({ candidate, interview, onClose, 
             <div className="d-flex align-items-center justify-content-between p-3 bg-light rounded-3 mb-4 border">
               <div className="d-flex align-items-center gap-3">
                 <img 
-                  src={c.avatar && c.avatar.startsWith('/') ? c.avatar : '/assets/images/man.jpg'} 
+                  src={c.avatar && c.avatar.startsWith('/') ? `${import.meta.env.BASE_URL}${c.avatar.slice(1)}` : (c.avatar || `${import.meta.env.BASE_URL}assets/images/man.jpg`)} 
                   alt={c.name} 
                   style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', border: '2px solid #98E843' }}
-                  onError={(e) => { e.target.src = '/assets/images/man.jpg'; }}
+                  onError={(e) => { 
+                    e.target.onerror = null;
+                    e.target.src = `${import.meta.env.BASE_URL}assets/images/man.jpg`; 
+                  }}
                 />
                 <div>
                   <div className="fw-bold text-dark">{c.name}</div>

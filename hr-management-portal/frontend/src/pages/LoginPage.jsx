@@ -25,6 +25,7 @@ export default function LoginPage({ onLoginSuccess }) {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [emailSentStatus, setEmailSentStatus] = useState(false);
+  const [isAutofillLocked, setIsAutofillLocked] = useState(true);
 
   // Guarantee fields and storage are reset whenever the login page mounts/refreshes
   useEffect(() => {
@@ -36,6 +37,7 @@ export default function LoginPage({ onLoginSuccess }) {
 
     // Remove readonly after initial load/autofill window
     const timer = setTimeout(() => {
+      setIsAutofillLocked(false);
       const emailInput = document.getElementById('workEmail');
       const passInput = document.getElementById('userPassword');
       if (emailInput) emailInput.removeAttribute('readonly');
@@ -395,8 +397,8 @@ export default function LoginPage({ onLoginSuccess }) {
                     className="urja-clean-input"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    onFocus={(e) => e.target.removeAttribute('readonly')}
-                    readOnly
+                    onFocus={() => setIsAutofillLocked(false)}
+                    readOnly={isAutofillLocked}
                     placeholder="Enter work email or username"
                     autoComplete="off"
                     required
@@ -421,8 +423,8 @@ export default function LoginPage({ onLoginSuccess }) {
                     className="urja-clean-input"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    onFocus={(e) => e.target.removeAttribute('readonly')}
-                    readOnly
+                    onFocus={() => setIsAutofillLocked(false)}
+                    readOnly={isAutofillLocked}
                     placeholder="Enter your password"
                     autoComplete="new-password"
                     required

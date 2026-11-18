@@ -1,0 +1,13 @@
+{
+  "name": "hr-management-portal-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TalentPulse ATS HR Management Portal",
+  "scripts": {
+    "dev": "npm run dev --prefix hr-management-portal/frontend",
+    "start": "npm run dev --prefix hr-management-portal/frontend",
+    "build": "npm run build --prefix hr-management-portal/frontend",
+    "preview": "npm run preview --prefix hr-management-portal/frontend",
+    "lint": "npm run lint --prefix hr-management-portal/frontend"
+  }
+}

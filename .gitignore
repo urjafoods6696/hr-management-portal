@@ -1,11 +1,22 @@
-# Dependencies & Build Outputs
+# ==============================================================================
+# TalentPulse ATS / HR Management Portal - Comprehensive .gitignore
+# ==============================================================================
+
+# Dependencies & Package Managers
 **/node_modules/
+.pnp
+.pnp.js
+
+# Build Outputs & Artifacts
 **/target/
 **/dist/
 **/build/
 .gradle/
+*.jar
+*.war
+*.ear
 
-# Tooling binaries & environment
+# Tooling Binaries, Profiles & Scratch
 /tools/
 /temp_chrome_profile/
 **/temp_chrome*
@@ -14,11 +25,33 @@
 **/temp_*
 **/scratch/
 chrome_*.png
+**/.vite/
 
-# Backups
+# Backups & Database Dumps
 **/backups/
+*.dump
+*.dmp
+*.sql.gz
+*.sql.bak
+*.sql.tar
 
-# IDE & Editor files
+# Local Environment Variables & Secrets
+.env
+.env.*
+!.env.example
+.env.local
+.env.*.local
+
+# Credentials & Keyrings
+*.pem
+*.key
+*.pkcs12
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+
+# IDE & Editor Temporary Files
 .vscode/
 .idea/
 *.iml
@@ -27,8 +60,10 @@ chrome_*.png
 .classpath
 .project
 .settings/
+*.sublime-project
+*.sublime-workspace
 
-# Logs & temp files
+# Application Logs & Diagnostics
 *.log
 *.tmp
 *.bak
@@ -36,18 +71,17 @@ chrome_*.png
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
-# OS Generated
+# OS-Generated Files
 Thumbs.db
 [Dd]esktop.ini
 .DS_Store
+*.swp
+*.swo
 
-# Local environments
-.env.local
-.env.*.local
-
-**/.vite/
-
-# Uploads
+# Uploaded Private User Documents & Media (Preserve Directory Structure via .gitkeep)
 hr-management-portal/backend/uploads/**
+!hr-management-portal/backend/uploads/
+!hr-management-portal/backend/uploads/**/
 !hr-management-portal/backend/uploads/**/.gitkeep

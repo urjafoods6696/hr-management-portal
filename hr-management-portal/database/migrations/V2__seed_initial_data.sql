@@ -50,7 +50,10 @@ INSERT INTO users (id, username, name, email, password_hash, status, phone_numbe
 (5, 'depthead.eng', 'Rajesh Kulkarni', 'rajesh.eng@company.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'ACTIVE', '+91 98200 55667'),
 (6, 'manager.amit', 'Amitav Mukherjee', 'amitav.mgr@company.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'ACTIVE', '+91 98200 66778'),
 (7, 'senior.mehta', 'Siddharth Mehta (VP)', 'smehta.vp@company.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'ACTIVE', '+91 98200 77889'),
-(8, 'interviewer.dev', 'Arjun Varma (Tech Lead)', 'arjun.tech@company.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'ACTIVE', '+91 98200 88990')
+(8, 'interviewer.dev', 'Arjun Varma (Tech Lead)', 'arjun.tech@company.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'ACTIVE', '+91 98200 88990'),
+(9, 'sandeep.plant', 'Sandeep Jadhav', 'sandeep.jadhav@company.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'ACTIVE', '+91 98200 99001'),
+(10, 'kavita.tech', 'Kavita Rao', 'kavita.rao@company.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'ACTIVE', '+91 98200 99002'),
+(11, 'sunil.recruiter', 'Sunil Verma', 'sunil.verma@company.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'INACTIVE', '+91 98220 99887')
 ON DUPLICATE KEY UPDATE name=VALUES(name);
 
 -- 5. User Roles Mapping
@@ -63,7 +66,12 @@ INSERT INTO user_roles (user_id, role_id) VALUES
 (6, 5), -- Amitav -> Approving Manager
 (7, 6), -- Siddharth -> Senior Mgmt
 (8, 7), -- Arjun -> Interviewer
-(8, 8)  -- Arjun -> Employee
+(8, 8), -- Arjun -> Employee
+(9, 4), -- Sandeep -> Dept Head
+(9, 5), -- Sandeep -> Approving Manager
+(10, 7), -- Kavita -> Interviewer
+(10, 8), -- Kavita -> Employee
+(11, 3)  -- Sunil -> HR Recruiter
 ON DUPLICATE KEY UPDATE user_id=VALUES(user_id);
 
 -- Update Head of Department
@@ -150,4 +158,4 @@ INSERT INTO audit_logs (actor_id, actor_name, action, entity_type, entity_id, ne
 
 -- 12. Initial Backup Record
 INSERT INTO backup_history (backup_type, status, file_name, file_size_bytes, location_reference, checksum_hash, initiated_by, completed_at) VALUES
-(1, 'SUCCESS', 'db_backup_full_20261021_0200.sql.gz', 14589200, 's3://hr-portal-secure-backups/daily/db_backup_full_20261021_0200.sql.gz', 'sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', 1, '2026-10-21 02:04:12');
+('SCHEDULED_DAILY', 'SUCCESS', 'db_backup_full_20261021_0200.sql.gz', 14589200, 's3://hr-portal-secure-backups/daily/db_backup_full_20261021_0200.sql.gz', 'sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', 1, '2026-10-21 02:04:12');

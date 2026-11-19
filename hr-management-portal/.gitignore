@@ -1,19 +1,52 @@
+# ==============================================================================
+# TalentPulse ATS / HR Management Portal - Sub-project .gitignore
+# ==============================================================================
+
 # Dependencies & Build Outputs
 **/node_modules/
 **/target/
 **/dist/
 **/build/
 .gradle/
+*.jar
+*.war
+*.ear
 
-# Tooling binaries & environment
+# Tooling Binaries & Scratch
 /tools/
 /temp_chrome_profile/
 **/temp_chrome*
 **/chrome-profile*
 **/edge_temp*
 **/temp_*
+**/scratch/
+**/.vite/
 
-# IDE & Editor files
+# Backups & Database Dumps
+**/backups/
+*.dump
+*.dmp
+*.sql.gz
+*.sql.bak
+*.sql.tar
+
+# Local Environments & Secrets
+.env
+.env.*
+!.env.example
+.env.local
+.env.*.local
+
+# Credentials
+*.pem
+*.key
+*.pkcs12
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+
+# IDE & Editor Temporary Files
 .vscode/
 .idea/
 *.iml
@@ -23,7 +56,7 @@
 .project
 .settings/
 
-# Logs & temp files
+# Logs & Diagnostics
 *.log
 *.tmp
 *.bak
@@ -37,7 +70,8 @@ Thumbs.db
 [Dd]esktop.ini
 .DS_Store
 
-# Local environments
-.env.local
-.env.*.local
-
+# Uploads
+backend/uploads/**
+!backend/uploads/
+!backend/uploads/**/
+!backend/uploads/**/.gitkeep

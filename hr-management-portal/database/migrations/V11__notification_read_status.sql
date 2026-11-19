@@ -12,7 +12,7 @@ CREATE INDEX idx_notif_user_status ON notifications(user_id, read_status);
 UPDATE notifications 
 SET read_status = CASE WHEN is_read = 1 THEN 'READ' ELSE 'UNREAD' END;
 
--- 3. Seed notifications for all users (5 unread per user)
+-- 3. Seed notifications for all users (5 unread per user) with duplicate prevention
 INSERT INTO notifications (user_id, event_type, title, message, target_url, is_read, read_status, delivery_status, sent_at, created_at)
 SELECT 
     u.id,
@@ -25,7 +25,11 @@ SELECT
     'SENT',
     NOW() - INTERVAL 2 MINUTE,
     NOW() - INTERVAL 2 MINUTE
-FROM users u;
+FROM users u
+WHERE NOT EXISTS (
+    SELECT 1 FROM notifications n 
+    WHERE n.user_id = u.id AND n.event_type = 'APPLICATION_RECEIVED' AND n.title = 'New application received'
+);
 
 INSERT INTO notifications (user_id, event_type, title, message, target_url, is_read, read_status, delivery_status, sent_at, created_at)
 SELECT 
@@ -39,7 +43,11 @@ SELECT
     'SENT',
     NOW() - INTERVAL 25 MINUTE,
     NOW() - INTERVAL 25 MINUTE
-FROM users u;
+FROM users u
+WHERE NOT EXISTS (
+    SELECT 1 FROM notifications n 
+    WHERE n.user_id = u.id AND n.event_type = 'INTERVIEW_SCHEDULED' AND n.title = 'Interview scheduled'
+);
 
 INSERT INTO notifications (user_id, event_type, title, message, target_url, is_read, read_status, delivery_status, sent_at, created_at)
 SELECT 
@@ -53,7 +61,11 @@ SELECT
     'SENT',
     NOW() - INTERVAL 1 HOUR,
     NOW() - INTERVAL 1 HOUR
-FROM users u;
+FROM users u
+WHERE NOT EXISTS (
+    SELECT 1 FROM notifications n 
+    WHERE n.user_id = u.id AND n.event_type = 'OFFER_RELEASED' AND n.title = 'Offer released'
+);
 
 INSERT INTO notifications (user_id, event_type, title, message, target_url, is_read, read_status, delivery_status, sent_at, created_at)
 SELECT 
@@ -67,7 +79,11 @@ SELECT
     'SENT',
     NOW() - INTERVAL 3 HOUR,
     NOW() - INTERVAL 3 HOUR
-FROM users u;
+FROM users u
+WHERE NOT EXISTS (
+    SELECT 1 FROM notifications n 
+    WHERE n.user_id = u.id AND n.event_type = 'CANDIDATE_JOINED' AND n.title = 'Candidate joined'
+);
 
 INSERT INTO notifications (user_id, event_type, title, message, target_url, is_read, read_status, delivery_status, sent_at, created_at)
 SELECT 
@@ -81,5 +97,9 @@ SELECT
     'SENT',
     NOW() - INTERVAL 5 HOUR,
     NOW() - INTERVAL 5 HOUR
-FROM users u;
+FROM users u
+WHERE NOT EXISTS (
+    SELECT 1 FROM notifications n 
+    WHERE n.user_id = u.id AND n.event_type = 'TAT_MILESTONE' AND n.title = 'TAT Milestone Reached'
+);
 

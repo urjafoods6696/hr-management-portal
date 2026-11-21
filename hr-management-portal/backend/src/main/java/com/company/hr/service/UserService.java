@@ -142,7 +142,7 @@ public class UserService {
                 .username(request.getUsername().trim().toLowerCase())
                 .name(request.getName().trim())
                 .email(request.getEmail().trim().toLowerCase())
-                .password(request.getPassword())
+                .password(null)
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .departmentRestrictionId(request.getDepartmentId())
                 .phoneNumber(request.getPhoneNumber())
@@ -206,7 +206,7 @@ public class UserService {
         user.setName(request.getName().trim());
         user.setEmail(request.getEmail().trim().toLowerCase());
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
-            user.setPassword(request.getPassword().trim());
+            user.setPassword(null);
             user.setPasswordHash(passwordEncoder.encode(request.getPassword().trim()));
         }
         if (request.getPhoneNumber() != null) user.setPhoneNumber(request.getPhoneNumber());

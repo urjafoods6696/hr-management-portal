@@ -4,8 +4,11 @@
 
 # Dependencies & Build Outputs
 **/node_modules/
+target/
 **/target/
+dist/
 **/dist/
+build/
 **/build/
 .gradle/
 *.jar
@@ -23,6 +26,7 @@
 **/.vite/
 
 # Backups & Database Dumps
+backups/
 **/backups/
 *.dump
 *.dmp
@@ -36,6 +40,9 @@
 !.env.example
 .env.local
 .env.*.local
+application-local.yml
+**/application-local.yml
+**/application-local*.yml
 
 # Credentials
 *.pem
@@ -57,6 +64,8 @@ id_ed25519
 .settings/
 
 # Logs & Diagnostics
+logs/
+**/logs/
 *.log
 *.tmp
 *.bak
@@ -71,7 +80,8 @@ Thumbs.db
 .DS_Store
 
 # Uploads
-backend/uploads/**
-!backend/uploads/
-!backend/uploads/**/
-!backend/uploads/**/.gitkeep
+uploads/
+**/uploads/**
+!**/uploads/
+!**/uploads/**/
+!**/uploads/**/.gitkeep

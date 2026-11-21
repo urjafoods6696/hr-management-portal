@@ -1,0 +1,17 @@
+spring:
+  datasource:
+    url: ${TIDB_URL:${DB_URL:jdbc:mysql://gateway01.ap-southeast-1.prod.aws.tidbcloud.com:4000/hr_portal_full_test?sslMode=VERIFY_IDENTITY}}
+    username: ${TIDB_USERNAME:${DB_USERNAME:}}
+    password: ${TIDB_PASSWORD:${DB_PASSWORD:}}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  flyway:
+    enabled: ${FLYWAY_ENABLED:false}
+    baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:true}
+    baseline-version: ${FLYWAY_BASELINE_VERSION:8}
+    validate-on-migrate: ${FLYWAY_VALIDATE_ON_MIGRATE:false}
+    locations: classpath:db/migration
+
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:validate}

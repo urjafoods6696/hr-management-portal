@@ -179,7 +179,7 @@ public class PasswordResetService {
         }
 
         User user = tokenEntity.getUser();
-        user.setPassword(newPassword);
+        user.setPassword(null);
         user.setPasswordHash(passwordEncoder.encode(newPassword));
         user.setUpdatedAt(LocalDateTime.now());
         userRepository.save(user);

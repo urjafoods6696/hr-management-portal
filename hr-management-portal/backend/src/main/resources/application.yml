@@ -6,14 +6,16 @@ server:
 spring:
   application:
     name: hr-management-portal-backend
+
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
 
   datasource:
     url: ${DB_URL:${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/hr_portal_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=UTF-8}}
     username: ${DB_USERNAME:${SPRING_DATASOURCE_USERNAME:root}}
-    password: ${DB_PASSWORD:${SPRING_DATASOURCE_PASSWORD:125406}}
+    password: ${DB_PASSWORD:${SPRING_DATASOURCE_PASSWORD:}}
     driver-class-name: com.mysql.cj.jdbc.Driver
+
     hikari:
       maximum-pool-size: ${DB_POOL_MAX_SIZE:10}
       minimum-idle: ${DB_POOL_MIN_IDLE:2}
@@ -28,15 +30,19 @@ spring:
   jpa:
     hibernate:
       ddl-auto: ${JPA_DDL_AUTO:validate}
+
     show-sql: ${SHOW_SQL:false}
+
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
         format_sql: false
 
+  # Flyway is disabled by default.
+  # Enable explicitly in a controlled test environment.
   flyway:
-    enabled: ${FLYWAY_ENABLED:true}
-    baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:true}
+    enabled: ${FLYWAY_ENABLED:false}
+    baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:false}
     validate-on-migrate: ${FLYWAY_VALIDATE_ON_MIGRATE:false}
     locations: classpath:db/migration
 
@@ -48,8 +54,9 @@ spring:
   mail:
     host: ${SMTP_HOST:smtp.office365.com}
     port: ${SMTP_PORT:587}
-    username: ${SMTP_USERNAME:recruitment-alerts@company.com}
-    password: ${SMTP_PASSWORD:secret}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+
     properties:
       mail:
         smtp:
@@ -60,45 +67,50 @@ spring:
           timeout: 5000
           writetimeout: 5000
 
-# Spring Boot Actuator & Health Check Configuration (For Render health check probes)
+# Actuator
 management:
   endpoints:
     web:
       exposure:
         include: health,info
+
   endpoint:
     health:
       show-details: when-authorized
       probes:
         enabled: true
+
   health:
     mail:
       enabled: false
 
-# Application Specific Properties
+# Application Properties
 app:
   jwt:
-    secret: ${JWT_SECRET:9a7f8c6e4d2b0a1f3e5c7a9b8d0e2f4a6b8c0d2e4f6a8b0c2d4e6f8a0b2c4e6f}
-    expiration-ms: ${JWT_EXPIRATION_MS:86400000} # 24 Hours
-    refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:604800000} # 7 Days
+    secret: ${JWT_SECRET}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+    refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:604800000}
 
   tat:
     default-target-days: 30
-    calculation-mode: CALENDAR_DAYS # Options: CALENDAR_DAYS, WORKING_DAYS
+    calculation-mode: CALENDAR_DAYS
     company-timezone: Asia/Kolkata
     escalation-threshold-days: 20
 
   storage:
     upload-dir: ${STORAGE_PATH:./uploads/documents}
+
     allowed-file-types:
       - application/pdf
       - application/vnd.openxmlformats-officedocument.wordprocessingml.document
       - image/jpeg
       - image/png
 
+# Swagger / OpenAPI
 springdoc:
   api-docs:
     path: /v3/api-docs
+
   swagger-ui:
     path: /swagger-ui.html
     tags-sorter: alpha

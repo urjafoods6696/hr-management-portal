@@ -8,15 +8,18 @@
 .pnp.js
 
 # Build Outputs & Artifacts
+target/
 **/target/
+dist/
 **/dist/
+build/
 **/build/
 .gradle/
 *.jar
 *.war
 *.ear
 
-# Tooling Binaries, Profiles & Scratch
+# Tooling Binaries, Profiles, Proxies & Scratch
 /tools/
 /temp_chrome_profile/
 **/temp_chrome*
@@ -26,8 +29,11 @@
 **/scratch/
 chrome_*.png
 **/.vite/
+powershell.cmd
+powershell.bat
 
 # Backups & Database Dumps
+backups/
 **/backups/
 *.dump
 *.dmp
@@ -41,6 +47,9 @@ chrome_*.png
 !.env.example
 .env.local
 .env.*.local
+application-local.yml
+**/application-local.yml
+**/application-local*.yml
 
 # Credentials & Keyrings
 *.pem
@@ -64,6 +73,8 @@ id_ed25519
 *.sublime-workspace
 
 # Application Logs & Diagnostics
+logs/
+**/logs/
 *.log
 *.tmp
 *.bak
@@ -80,8 +91,9 @@ Thumbs.db
 *.swp
 *.swo
 
-# Uploaded Private User Documents & Media (Preserve Directory Structure via .gitkeep)
-hr-management-portal/backend/uploads/**
-!hr-management-portal/backend/uploads/
-!hr-management-portal/backend/uploads/**/
-!hr-management-portal/backend/uploads/**/.gitkeep
+# Uploads (Preserve Directory Structure via .gitkeep)
+uploads/
+**/uploads/**
+!**/uploads/
+!**/uploads/**/
+!**/uploads/**/.gitkeep
